@@ -1,24 +1,27 @@
-# ShelfTrack
+# ShelfTrack (Shelfmark)
 
-Inventory / shelf tracking application workspace.
+Workshop inventory app with built-in QR scanning to identify products on the floor, pick/receive stock, and track movements.
 
-This repository was created from a Grok workspace export (`grok-workspace.zip`).
+Built with React 19, TanStack Router/Start, Vite, Tailwind CSS v4, Zustand, and related tooling.
 
-## About
+## Uploaded so far (batches)
 
-ShelfTrack is a modern web app for product/stock management with QR scanning, stock movements, and related features. It is built with React, TanStack Router/Start, Vite, Tailwind CSS, and supporting libraries (Kysely, better-auth, etc.).
+- Top-level: `package.json`, `tsconfig.json`, `vite.config.ts`, `eslint.config.mjs`, `.prettierrc`, `.project_id`, `startup.sh`, `AGENTS.md`
+- Scripts (partial): `app-env-plugin.mjs`, `migration-plan.mjs`, `browser-guard.mjs`, `preview-thumbnail.mjs`
+- Core `src/`:
+  - Entry: `router.tsx`, `styles.css`, `types/jsqr.d.ts`, `lib/utils.ts`
+  - Routes: `__root.tsx`, `_app.tsx`, `_app/index.tsx` (floor), `_app/catalog.tsx`, `_app/scan.tsx`, `_app/activity.tsx`
 
-The original workspace contained approximately 360 files including source code, configuration, screenshots, and build artifacts under `.grok/`, `src/`, `public/`, etc.
+Still remaining (next batches on request):
+- Remaining scripts, `src/components/*`, `src/lib/*` (inventory, auth, db, etc.), `src/routes/_app/catalog.$id.tsx`, `server/`, `migrations/`, `public/`, `.grok/` skills/references, screenshots (binary), `package-lock.json`
 
-**Note on contents:** Due to the large number of files (including binary PNGs) and practical limits of the available GitHub integration tools for bulk/binary uploads, the full workspace has not been automatically committed here. 
-
-You can download the original `grok-workspace.zip` from the chat attachments and extract/push it yourself, or reply asking me to push specific parts (for example the `src/` directory, `package.json`, configs, etc.).
-
-## Quick start (once source files are present)
+## Quick start
 
 ```bash
 npm install
 npm run dev
 ```
 
-See `package.json` scripts and any `AGENTS.md` for more details on the app-builder workspace conventions.
+App name in UI: **Shelfmark**. Listen on `0.0.0.0:8080`.
+
+Original full workspace: attached `grok-workspace.zip` in the chat.
