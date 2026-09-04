@@ -1,0 +1,105 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader", ui-serif, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  --color-background: #0c0d0c;
+  --color-foreground: #eceae4;
+  --color-card: #141514;
+  --color-card-foreground: #eceae4;
+  --color-popover: #1b1c1a;
+  --color-popover-foreground: #eceae4;
+  --color-primary: #e8e6df;
+  --color-primary-foreground: #121311;
+  --color-secondary: #1c1d1b;
+  --color-secondary-foreground: #eceae4;
+  --color-muted: #1c1d1b;
+  --color-muted-foreground: #9a958c;
+  --color-accent: #222421;
+  --color-accent-foreground: #eceae4;
+  --color-destructive: #c45c4a;
+  --color-destructive-foreground: #f6eeea;
+  --color-border: rgb(232 230 223 / 10%);
+  --color-input: rgb(232 230 223 / 12%);
+  --color-ring: #b4bec8;
+  --color-steel: #b4bec8;
+  --color-ok: #8fa39a;
+  --color-warn: #c4a574;
+  --color-paper: #f4f1ea;
+
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  body {
+    min-height: 100dvh;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::selection {
+  background: rgb(180 190 200 / 28%);
+  color: var(--color-foreground);
+}
+
+.shadow-border {
+  box-shadow: 0 0 0 1px rgb(232 230 223 / 8%);
+}
+
+.shadow-border-hover {
+  box-shadow: 0 0 0 1px rgb(232 230 223 / 14%);
+}
