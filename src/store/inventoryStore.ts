@@ -152,7 +152,7 @@ export async function getQRMapping(): Promise<QRMappingConfig> {
 
 export async function saveQRMapping(config: QRMappingConfig): Promise<void> {
   if (isGasEnabled()) {
-    await gas.gasSaveQRMapping(config);
+    await gas.gasSaveQRMapping(config as any);
     return;
   }
   saveLocal(QR_CONFIG_KEY, config);
