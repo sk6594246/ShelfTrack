@@ -31,14 +31,14 @@ export interface StockMovement {
   createdAt: string;
 }
 
-export interface QRMappingConfig {
+export type QRMappingConfig = {
   /** Field used to look up an existing product */
   primaryLookupField: ProductField;
   /** Fields that will be pre-filled when creating a new product from a scan */
   fillFields: ProductField[];
   /** How to interpret the QR payload */
   payloadParser: 'plain' | 'json';
-}
+};
 
 export const DEFAULT_QR_MAPPING: QRMappingConfig = {
   primaryLookupField: 'sku',
