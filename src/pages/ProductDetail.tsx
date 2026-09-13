@@ -10,8 +10,8 @@ import {
   Edit2,
   Minus,
   Package,
-  Package,
   Plus,
+  QrCode,
   Trash2,
 } from 'lucide-react';
 import { useProduct, useProducts } from '../hooks/useProducts';
@@ -186,7 +186,7 @@ export function ProductDetail() {
                 {locations.map(loc => (
                   <option key={loc} value={loc}>
                     {loc || 'Unassigned'}
-                  >
+                  </option>
                 ))}
               </select>
             </div>
@@ -241,7 +241,7 @@ export function ProductDetail() {
                 <Package className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-bold text-slate-900">{product.name}</h1>
+                {product.name}
                 <p className="text-sm text-slate-500">SKU: {product.sku}</p>
                 <p className="text-sm text-slate-500">Category: {product.category || 'Not assigned'}</p>
               </div>
@@ -387,7 +387,7 @@ export function ProductDetail() {
                 {movements.map((m) => (
                   <li
                     key={m.id}
-                    className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-slate-100"
+                    className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm ring-1 ring-slice-100"
                   >
                     <div>
                       <span

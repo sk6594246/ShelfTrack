@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Package, Users, BarChart2, Search, QrCode, AlertTriangle } from 'lucide-react';
+import { ArrowRight, AlertTriangle, MapPin, Package, QrCode, Search } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
+import type { Product } from '../types/inventory';
 
 export function LocationMaster() {
   const { products, loading } = useProducts();
@@ -80,7 +81,7 @@ export function LocationMaster() {
             <p className="mt-1 text-2xl font-bold text-slate-900">{locations.filter(l => l.location !== 'Unassigned').length}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-sm font-medium text-slate-500">Products in Locations</p>
+            <div className="text-sm font-medium text-slate-500">Products in Locations</div>
             <p className="mt-1 text-2xl font-bold text-slate-900">
               {locations.reduce((sum, loc) => sum + loc.productCount, 0)}
             </p>
@@ -157,7 +158,7 @@ export function LocationMaster() {
               </div>
             </div>
           </div>
-        >
+        </section>
       )}
     </div>
   );
