@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, Info } from 'lucide-react';
 import { useQRMapping } from '../../hooks/useQRMapping';
@@ -15,7 +15,7 @@ export function QRMapping() {
   const { config, update, loading } = useQRMapping();
   const [draft, setDraft] = useState<QRMappingConfig>(config);
   const [saved, setSaved] = useState(false);
-  
+
   // Sync draft when real config loads from Google Sheets
   useEffect(() => {
     if (!loading) {
@@ -53,7 +53,9 @@ export function QRMapping() {
         </button>
         <div>
           <h1 className="text-xl font-bold text-slate-900">QR Field Mapping</h1>
-          <p className="text-sm text-slate-500">Configure how scanned codes map to product fields</p>
+          <p className="text-sm text-slate-500">
+            Configure how scanned codes map to product fields
+          </p>
         </div>
       </header>
 
@@ -91,112 +93,4 @@ export function QRMapping() {
                 }}
                 className="h-4 w-4 text-indigo-600"
               />
-              <span className="font-medium text-slate-800">
-                {PRODUCT_FIELD_LABELS[field]}
-              </span>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      {/* Prefill fields */}
-      <section className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-slate-900">Fields to pre-fill on new product</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          If no matching product is found, these fields will be filled from the scanned value.
-        </p>
-        <div className="space-y-2">
-          {ALL_PRODUCT_FIELDS.map((field) => (
-            <label
-              key={field}
-              className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 transition ${
-                draft.fillFields.includes(field)
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={draft.fillFields.includes(field)}
-                onChange={() => toggleFillField(field)}
-                className="h-4 w-4 rounded text-indigo-600"
-              />
-              <span className="font-medium text-slate-800">
-                {PRODUCT_FIELD_LABELS[field]}
-              </span>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      {/* Payload parser */}
-      <section className="mb-8">
-        <h2 className="mb-2 text-sm font-semibold text-slate-900">QR payload format</h2>
-        <div className="space-y-2">
-          <label
-            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${
-              draft.payloadParser === 'plain'
-                ? 'border-indigo-500 bg-indigo-50'
-                : 'border-slate-200 bg-white'
-            }`}
-          >
-            <input
-              type="radio"
-              name="parser"
-              checked={draft.payloadParser === 'plain'}
-              onChange={() => {
-                setDraft((prev) => ({ ...prev, payloadParser: 'plain' }));
-                setSaved(false);
-              }}
-              className="h-4 w-4 text-indigo-600"
-            />
-            <div>
-              <p className="font-medium text-slate-800">Plain text</p>
-              <p className="text-xs text-slate-500">
-                Entire QR value is used for the selected fields
-              </p>
-            </div>
-          </label>
-          <label
-            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${
-              draft.payloadParser === 'json'
-                ? 'border-indigo-500 bg-indigo-50'
-                : 'border-slate-200 bg-white'
-            }`}
-          >
-            <input
-              type="radio"
-              name="parser"
-              checked={draft.payloadParser === 'json'}
-              onChange={() => {
-                setDraft((prev) => ({ ...prev, payloadParser: 'json' }));
-                setSaved(false);
-              }}
-              className="h-4 w-4 text-indigo-600"
-            />
-            <div>
-              <p className="font-medium text-slate-800">JSON object</p>
-              <p className="text-xs text-slate-500">
-                Expects {'{"sku":"...","name":"..."}'} style payload
-              </p>
-            </div>
-          </label>
-        </div>
-      </section>
-
-      <button
-        onClick={handleSave}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-medium text-white hover:bg-indigo-700"
-      >
-        {saved ? (
-          <>
-            <Check className="h-4 w-4" />
-            Saved
-          </>
-        ) : (
-          'Save mapping'
-        )}
-      </button>
-    </div>
-  );
-}
+              <span
