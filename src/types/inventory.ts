@@ -42,8 +42,8 @@ export type QRMappingConfig = {
 
 export const DEFAULT_QR_MAPPING: QRMappingConfig = {
   primaryLookupField: 'sku',
-  fillFields: ['sku', 'barcode'],
-  payloadParser: 'plain',
+  fillFields: ['sku', 'barcode', 'name', 'category', 'location', 'notes'],
+  payloadParser: 'json',
 };
 
 export const PRODUCT_FIELD_LABELS: Record<ProductField, string> = {
@@ -65,3 +65,13 @@ export const ALL_PRODUCT_FIELDS: ProductField[] = [
   'location',
   'notes',
 ];
+
+export function stockStatus(product: Pick<Product, "quantity" | "minQuantity">): StockStatus {
+  if (product.quantity <= 0) return "out";
+  if (product.quantity <= product.minQuantity) return "low";
+  return "ok";
+}
+
+export function payloadForSku(sku: string) {
+  return `shelfmark:${sku}`;
+}

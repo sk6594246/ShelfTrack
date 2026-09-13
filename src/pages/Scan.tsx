@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, X } from 'lucide-react';
+import { CheckCircle2, X, Plus, Minus, Edit2 } from 'lucide-react';
 import { QRScanner } from '../components/scanner/QRScanner';
 import { useQRMapping } from '../hooks/useQRMapping';
 import {
@@ -9,13 +9,16 @@ import {
   buildPreFillFromScan,
   mappingSummary,
 } from '../lib/qr';
+import { useProducts } from '../hooks/useProducts';
 
 export function Scan() {
   const navigate = useNavigate();
   const { config } = useQRMapping();
+  const { products } = useProducts();
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [scanning, setScanning] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   async function handleScan(raw: string) {
     if (!scanning) return;
@@ -27,10 +30,8 @@ export function Scan() {
     const existing = await lookupProductFromScan(result, config);
 
     if (existing) {
-      setMessage(`Found: ${existing.name}`);
-      setTimeout(() => {
-        navigate(`/products/${existing.id}`);
-      }, 600);
+      setSelectedProduct(existing);
+      setMessage(`Found: ${existing.name} - Choose action:`);
       return;
     }
 
@@ -42,10 +43,39 @@ export function Scan() {
     }, 700);
   }
 
+  function handleViewProduct() {
+    if (selectedProduct) {
+      navigate(`/products/${selectedProduct.id}`);
+    }
+    reset();
+  }
+
+  function handleAdjustStock() {
+    if (selectedProduct) {
+      navigate(`/products/${selectedProduct.id}`, { state: { showAdjust: true } });
+    }
+    reset();
+  }
+
+  function handlePurchase() {
+    if (selectedProduct) {
+      navigate(`/products/${selectedProduct.id}/purchase`);
+    }
+    reset();
+  }
+
+  function handleSale() {
+    if (selectedProduct) {
+      navigate(`/products/${selectedProduct.id}/sale`);
+    }
+    reset();
+  }
+
   function reset() {
     setLastResult(null);
     setMessage(null);
     setScanning(true);
+    setSelectedProduct(null);
   }
 
   return (
@@ -63,7 +93,11 @@ export function Scan() {
         <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+              {selectedProduct ? (
+                <Edit2 className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+              ) : (
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+              )}
               <div>
                 {message && <p className="font-medium text-slate-900">{message}</p>}
                 {lastResult && (
@@ -81,7 +115,35 @@ export function Scan() {
               <X className="h-4 w-4" />
             </button>
           </div>
-          {!scanning && (
+          {!scanning && selectedProduct && (
+            <div className="mt-4 space-x-3">
+              <button
+                onClick={handleViewProduct}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+              >
+                View Details
+              </button>
+              <button
+                onClick={handleAdjustStock}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+              >
+                Adjust Stock
+              </button>
+              <button
+                onClick={handlePurchase}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50"
+              >
+                Purchase
+              </button>
+              <button
+                onClick={handleSale}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:red-50"
+              >
+                Sale
+              </button>
+            </div>
+          )}
+          {!scanning && !selectedProduct && (
             <button
               onClick={reset}
               className="mt-3 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"

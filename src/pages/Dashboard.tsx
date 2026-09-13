@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Package, QrCode, TrendingDown } from 'lucide-react';
+import { AlertTriangle, BarChart2, Package, QrCode, TrendingDown, Users } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/product/ProductCard';
 
@@ -9,6 +9,31 @@ export function Dashboard() {
   const total = products.length;
   const lowStock = products.filter((p) => p.quantity > 0 && p.quantity <= p.reorderPoint);
   const outOfStock = products.filter((p) => p.quantity <= 0);
+  const inStock = products.filter((p) => p.quantity > p.reorderPoint);
+
+  // Calculate total units in stock
+  const totalUnits = products.reduce((sum, p) => sum + p.quantity, 0);
+
+  // Calculate average units per product
+  const avgUnits = total > 0 ? Math.round(totalUnits / total) : 0;
+
+  // Calculate inventory health percentage (products with adequate stock)
+  const healthPercentage = total > 0
+    ? Math.round(((inStock.length) / total) * 100)
+    : 100;
+
+  // Calculate stock distribution by category
+  const categoryDistribution = products.reduce((acc, product) => {
+    const category = product.category || 'Uncategorized';
+    acc[category] = (acc[category] || 0) + product.quantity;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Get top 3 categories by stock value
+  const topCategories = Object.entries(categoryDistribution)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 3)
+    .map(([category, quantity]) => ({ category, quantity }));
 
   if (loading) {
     return (
@@ -26,7 +51,7 @@ export function Dashboard() {
       </header>
 
       {/* Summary cards */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-slate-500">
             <Package className="h-4 w-4" />
@@ -48,6 +73,20 @@ export function Dashboard() {
           </div>
           <p className="mt-1 text-2xl font-bold text-red-800">{outOfStock.length}</p>
         </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-blue-700">
+            <Users className="h-4 w-4" />
+            <span className="text-xs font-medium">Avg Stock</span>
+          </div>
+          <p className="mt-1 text-2xl font-bold text-blue-800">{avgUnits}</p>
+        </div>
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-green-700">
+            <BarChart2 className="h-4 w-4" />
+            <span className="text-xs font-medium">Health</span>
+          </div>
+          <p className="mt-1 text-2xl font-bold text-green-800">{healthPercentage}%</p>
+        </div>
         <Link
           to="/scan"
           className="flex flex-col items-center justify-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm transition hover:bg-indigo-100"
@@ -56,6 +95,29 @@ export function Dashboard() {
           <span className="text-sm font-medium text-indigo-700">Scan QR</span>
         </Link>
       </div>
+
+      {/* Category distribution section */}
+      {topCategories.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-lg font-semibold text-slate-900">Stock by Category</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {topCategories.map(({ category, quantity }) => (
+              <div key={category} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-2 flex items-baseline justify-between">
+                  <span className="text-sm font-medium text-slate-700">{category}</span>
+                  <span className="text-sm font-medium text-slate-900">{quantity} units</span>
+                </div>
+                <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-600 rounded-full"
+                    style={{ width: `${Math.min(100, Math.round((quantity / Math.max(1, Math.max(...Object.values(categoryDistribution))) * 100)))}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Low stock section */}
       {(lowStock.length > 0 || outOfStock.length > 0) && (

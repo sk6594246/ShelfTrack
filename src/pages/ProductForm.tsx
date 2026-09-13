@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useProducts, useProduct } from '../hooks/useProducts';
 import type { Product } from '../types/inventory';
+import { CATEGORIES } from '../types/inventory';
 
 type FormState = {
   name: string;
@@ -153,7 +154,7 @@ export function ProductForm() {
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="SKU *">
+          <Field label="SKU *" required>
             <input
               value={form.sku}
               onChange={(e) => update('sku', e.target.value)}
@@ -183,19 +184,25 @@ export function ProductForm() {
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Category">
-            <input
+            <select
               value={form.category}
               onChange={(e) => update('category', e.target.value)}
-              className="input"
-              placeholder="e.g. Electronics"
-            />
+              className="select"
+            >
+              <option value="">Select category</option>
+              {CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Location">
+          <Field label="Location (optional)">
             <input
               value={form.location}
               onChange={(e) => update('location', e.target.value)}
               className="input"
-              placeholder="Shelf A1"
+              placeholder="Shelf A1 (optional)"
             />
           </Field>
         </div>
@@ -251,6 +258,19 @@ export function ProductForm() {
           outline: none;
         }
         .input:focus {
+          border-color: #818cf8;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+        .select {
+          width: 100%;
+          border-radius: 0.75rem;
+          border: 1px solid #e2e8f0;
+          background: white;
+          padding: 0.625rem 0.875rem;
+          font-size: 0.875rem;
+          outline: none;
+        }
+        .select:focus {
           border-color: #818cf8;
           box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
         }

@@ -7,6 +7,9 @@ import { ProductDetail } from './pages/ProductDetail';
 import { ProductForm } from './pages/ProductForm';
 import { Settings } from './pages/settings/Settings';
 import { QRMapping } from './pages/settings/QRMapping';
+import { LocationMaster } from './pages/LocationMaster';
+import { CategoryMaster } from './pages/CategoryMaster';
+import { GenerateQR } from './pages/GenerateQR';
 
 export default function App() {
   return (
@@ -19,8 +22,12 @@ export default function App() {
           <Route path="products/new" element={<ProductForm />} />
           <Route path="products/:id" element={<ProductDetail />} />
           <Route path="products/:id/edit" element={<ProductForm />} />
+          <Route path="products/:id/qr" element={<GenerateQR />} />
+          <Route path="location-master/qr" element={<GenerateQR />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/qr-mapping" element={<QRMapping />} />
+          <Route path="location-master" element={<LocationMaster />} />
+          <Route path="category-master" element={<CategoryMaster />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
