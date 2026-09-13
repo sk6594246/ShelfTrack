@@ -12,9 +12,16 @@ import { mappingSummary } from '../../lib/qr';
 
 export function QRMapping() {
   const navigate = useNavigate();
-  const { config, update } = useQRMapping();
+  const { config, update, loading } = useQRMapping();
   const [draft, setDraft] = useState<QRMappingConfig>(config);
   const [saved, setSaved] = useState(false);
+  
+  // Sync draft when real config loads from Google Sheets
+  useEffect(() => {
+    if (!loading) {
+      setDraft(config);
+    }
+  }, [config, loading]);
 
   function toggleFillField(field: ProductField) {
     setDraft((prev) => {
