@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Folder, Package, Users, BarChart2, Search } from 'lucide-react';
+import { ArrowRight, Folder, Package, Search } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
-import { CATEGORIES } from '../types/inventory';
+import { CATEGORIES, type Product } from '../types/inventory';
 
 export function CategoryMaster() {
   const { products, loading } = useProducts();
@@ -166,7 +166,7 @@ export function CategoryMaster() {
           The system comes with these predefined categories:
         </p>
         <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((cat) => (
+          {CATEGORIES.map((cat: string) => (
             <span key={cat} className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-800 rounded-full">
               {cat}
             </span>

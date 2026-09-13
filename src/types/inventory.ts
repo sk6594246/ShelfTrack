@@ -66,9 +66,29 @@ export const ALL_PRODUCT_FIELDS: ProductField[] = [
   'notes',
 ];
 
-export function stockStatus(product: Pick<Product, "quantity" | "minQuantity">): StockStatus {
+export const CATEGORIES: string[] = [
+  'Electronics',
+  'Clothing & Apparel',
+  'Books & Media',
+  'Food & Beverages',
+  'Office Supplies',
+  'Hardware & Tools',
+  'Home & Garden',
+  'Toys & Games',
+  'Health & Beauty',
+  'Sports & Outdoors',
+  'Automotive',
+  'Arts & Crafts',
+  'Baby & Kids',
+  'Pet Supplies',
+  'Other'
+];
+
+export type StockStatus = "out" | "low" | "ok";
+
+export function stockStatus(product: Pick<Product, "quantity" | "reorderPoint">): StockStatus {
   if (product.quantity <= 0) return "out";
-  if (product.quantity <= product.minQuantity) return "low";
+  if (product.quantity <= product.reorderPoint) return "low";
   return "ok";
 }
 

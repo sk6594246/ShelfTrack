@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, X, Plus, Minus, Edit2 } from 'lucide-react';
+import { CheckCircle2, X, Edit2 } from 'lucide-react';
 import { QRScanner } from '../components/scanner/QRScanner';
 import { useQRMapping } from '../hooks/useQRMapping';
 import {
@@ -14,7 +14,8 @@ import { useProducts } from '../hooks/useProducts';
 export function Scan() {
   const navigate = useNavigate();
   const { config } = useQRMapping();
-  const { products } = useProducts();
+  const { products: _ } = useProducts();
+// Note: products store is used implicitly by lookupProductFromScan, so we keep the hook call
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [scanning, setScanning] = useState(true);

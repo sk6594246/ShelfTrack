@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Info, Square, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, Info, ChevronDown } from 'lucide-react';
 import { useQRMapping } from '../../hooks/useQRMapping';
 import {
   ALL_PRODUCT_FIELDS,
@@ -219,7 +219,7 @@ export function QRMapping() {
             loading ? 'opacity-50' : ''
           }`}
         >
-          {saving ? 'Saving…' : 'Save Mapping'}
+          {loading ? 'Saving…' : 'Save Mapping'}
         </button>
       </div>
 

@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Copy, Download, Plus, Printer, QrCode, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Copy, QrCode } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
-import { useLocations } from '../hooks/useLocations';
 import { useQRMapping } from '../hooks/useQRMapping';
 import type { Product } from '../types/inventory';
 import { PRODUCT_FIELD_LABELS } from '../types/inventory';
@@ -11,10 +10,7 @@ import html2canvas from 'html2canvas';
 
 export function GenerateQR() {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const isProductPage = Boolean(id);
   const { products } = useProducts();
-  const { locations } = useLocations();
   const { config } = useQRMapping();
 
   const [item, setItem] = useState<Product | null>(null);
@@ -82,7 +78,6 @@ export function GenerateQR() {
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', [50, 50]); // 50x50mm label size
 
-    const imgProps = pdf.getImageProperties(imgData);
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
 
@@ -93,11 +88,11 @@ export function GenerateQR() {
   };
 
   // Auto-generate when item or location changes
-  // useEffect(() => {
-  //   if (item || (itemType === 'location' && locationValue)) {
-  //     handleGenerate();
-  //   }
-  // }, [item, itemType, locationValue, config]);
+  useEffect(() => {
+    if (item || (itemType === 'location' && locationValue)) {
+      handleGenerate();
+    }
+  }, [item, itemType, locationValue, config]);
 
   if (isGenerating) {
     return (
@@ -330,13 +325,13 @@ export function GenerateQR() {
               Payload format: <strong>{config.payloadParser === 'json' ? 'JSON' : 'Plain Text'}</strong>
             </span>
           </div>
-          <div class="flex items-start">
+          <div className="flex items-start">
             <span className="flex-shrink-0 h-3 w-3 text-indigo-500">•</span>
             <span className="flex-1">
               Lookup by: <strong>{PRODUCT_FIELD_LABELS[config.primaryLookupField]}</strong>
             </span>
           </div>
-          <div class="flex items-start">
+          <div className="flex items-start">
             <span className="flex-shrink-0 h-3 w-3 text-indigo-500">•</span>
             <span className="flex-1">
               Pre-filled fields: <strong>

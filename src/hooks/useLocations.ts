@@ -11,13 +11,13 @@ export function useLocations() {
     try {
       setError(null);
       setLoading(true);
-      const products = await getProducts();
+      const products: Product[] = await getProducts();
       // Get unique locations, excluding empty ones
       const uniqueLocations = [
         ...new Set(
           products
             .map((p) => p.location?.trim())
-            .filter((loc) => loc && loc.length > 0)
+            .filter((loc): loc is string => !!loc && loc.length > 0)
         ),
       ].sort();
       setLocations(uniqueLocations);
