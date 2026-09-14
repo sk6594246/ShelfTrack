@@ -144,3 +144,14 @@ export interface DocumentLine {
   locationId?: string;
   notes?: string;
 }
+
+export interface StockBatch {
+  id: string;
+  productId: string;
+  locationId: string;
+  quantity: number;
+  remaining: number;
+  receivedAt: string;
+  documentId?: string;
+  documentLineId?: string;
+}
