@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Package, Plus, Search } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/product/ProductCard';
 
@@ -10,6 +10,13 @@ export function Inventory() {
   const { products, loading } = useProducts();
   const [query, setQuery] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+
+  const counts = useMemo(() => {
+    const inStock = products.filter((p) => p.quantity > p.reorderPoint).length;
+    const low = products.filter((p) => p.quantity > 0 && p.quantity <= p.reorderPoint).length;
+    const out = products.filter((p) => p.quantity <= 0).length;
+    return { all: products.length, in: inStock, low, out };
+  }, [products]);
 
   const filtered = useMemo(() => {
     let list = products;
@@ -22,7 +29,8 @@ export function Inventory() {
           p.sku.toLowerCase().includes(q) ||
           p.barcode?.toLowerCase().includes(q) ||
           p.customId?.toLowerCase().includes(q) ||
-          p.category?.toLowerCase().includes(q)
+          p.category?.toLowerCase().includes(q) ||
+          p.location?.toLowerCase().includes(q)
       );
     }
 
@@ -39,74 +47,103 @@ export function Inventory() {
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+      <div className="mx-auto w-full max-w-5xl space-y-4 p-4 md:p-6">
+        <div className="st-skeleton h-10 w-48" />
+        <div className="st-skeleton h-11 w-full rounded-xl" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="st-skeleton h-28 rounded-2xl" />
+          ))}
+        </div>
       </div>
     );
   }
+
+  const filters: { value: StockFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'in', label: 'In stock' },
+    { value: 'low', label: 'Low' },
+    { value: 'out', label: 'Out' },
+  ];
 
   return (
     <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
-          <p className="text-slate-500">{products.length} products</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inventory</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {products.length} product{products.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <Link
           to="/products/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
           Add
         </Link>
       </header>
 
-      <div className="mb-4 space-y-3">
+      <div className="mb-5 space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="search"
-            placeholder="Search name, SKU, barcode…"
+            placeholder="Search name, SKU, barcode, location…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {(
-            [
-              ['all', 'All'],
-              ['in', 'In stock'],
-              ['low', 'Low'],
-              ['out', 'Out'],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              onClick={() => setStockFilter(value)}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                stockFilter === value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
+          {filters.map(({ value, label }) => {
+            const active = stockFilter === value;
+            const count = counts[value];
+            return (
+              <button
+                key={value}
+                onClick={() => setStockFilter(value)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                  active
+                    ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                    : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                    active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
-          <p className="text-slate-600">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+            <Package className="h-6 w-6" />
+          </div>
+          <p className="mt-4 font-semibold text-slate-800">
             {query || stockFilter !== 'all' ? 'No matching products' : 'No products yet'}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            {query || stockFilter !== 'all'
+              ? 'Try a different search or filter'
+              : 'Add your first product to start tracking'}
           </p>
           {!query && stockFilter === 'all' && (
             <Link
               to="/products/new"
-              className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:underline"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
             >
-              Add your first product
+              <Plus className="h-4 w-4" />
+              Add product
             </Link>
           )}
         </div>
