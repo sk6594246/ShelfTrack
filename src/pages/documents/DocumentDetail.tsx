@@ -239,9 +239,11 @@ export function DocumentDetail() {
             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50"
           />
         </div>
-        {doc.notes && (
-          <p className="mt-3 hidden text-sm text-slate-600 print:block">{doc.notes}</p>
-        )}
+        {doc.notes ? (
+          <p className="mt-3 hidden text-sm text-slate-600 print:block">
+            {doc.notes}
+          </p>
+        ) : null}
 
         <h2 className="mt-6 text-sm font-semibold text-slate-700">Line items</h2>
         <div className="mt-2 overflow-x-auto">
@@ -264,9 +266,15 @@ export function DocumentDetail() {
                   const p = productMap.get(line.productId);
                   return (
                     <tr key={line.id} className="border-b border-slate-50">
-                      <td className="py-2.5 pr-2 font-medium text-slate-900">{p?.name || 'Unknown'}</td>
-                      <td className="py-2.5 pr-2 font-mono text-xs text-slate-500">{p?.sku || '—'}</td>
-                      <td className="py-2.5 pr-2 text-right font-semibold text-slate-800">{line.quantity}</td>
+                      <td className="py-2.5 pr-2 font-medium text-slate-900">
+                        {p?.name || 'Unknown'}
+                      </td>
+                      <td className="py-2.5 pr-2 font-mono text-xs text-slate-500">
+                        {p?.sku || '—'}
+                      </td>
+                      <td className="py-2.5 pr-2 text-right font-semibold text-slate-800">
+                        {line.quantity}
+                      </td>
                       {!isPosted && (
                         <td className="py-2.5 text-right print:hidden">
                           <button type="button" onClick={() => handleRemoveLine(line.id)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
@@ -315,11 +323,11 @@ export function DocumentDetail() {
           </form>
         )}
 
-        {error && (
+        {error ? (
           <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 print:hidden">
             {error}
           </div>
-        )}
+        ) : null}
 
         {!isPosted && (
           <button
