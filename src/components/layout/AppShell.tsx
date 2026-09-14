@@ -1,17 +1,17 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Home, Package, QrCode, Settings } from 'lucide-react';
+import { Home, Package, QrCode, Settings, Database } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home, end: true },
   { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/scan', label: 'Scan', icon: QrCode },
+  { to: '/masters', label: 'Masters', icon: Database },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-100 md:flex-row">
-      {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-200/80 bg-white md:flex">
         <div className="flex h-16 items-center gap-3 border-b border-slate-200/80 px-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">
@@ -62,12 +62,10 @@ export function AppShell() {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex flex-1 flex-col pb-20 md:pb-0">
         <Outlet />
       </main>
 
-      {/* Mobile bottom nav */}
       <nav className="st-safe-bottom fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/90 bg-white/95 backdrop-blur-md md:hidden">
         <div className="flex h-16 items-center justify-around px-1">
           {navItems.map(({ to, label, icon: Icon, end }) => (
@@ -76,7 +74,7 @@ export function AppShell() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `relative flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-semibold transition ${
+                `relative flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition ${
                   isActive ? 'text-indigo-600' : 'text-slate-500'
                 }`
               }
