@@ -35,7 +35,7 @@ export function Settings() {
               </div>
               <div>
                 <p className="font-semibold text-slate-900">QR Field Mapping</p>
-                <p className="mt-0.5 text-xs text-slate-500">{mappingSummary(config)}</p>
+                <p className={'mt-0.5 text-xs text-slate-500'}>{mappingSummary(config)}</p>
               </div>
             </div>
             <ChevronRight className="h-5 w-5 shrink-0 text-slate-300" />
