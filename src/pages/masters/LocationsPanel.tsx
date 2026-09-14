@@ -129,7 +129,7 @@ export function LocationsPanel() {
                     }`}
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900">{loc.name}</p>
+                      <p className={'truncate font-semibold text-slate-900'}>{loc.name}</p>
                       <p className="text-xs text-slate-500">
                         {loc.code ? `Code ${loc.code} · ` : ''}
                         {count} product{count !== 1 ? 's' : ''}
@@ -148,12 +148,16 @@ export function LocationsPanel() {
         {formOpen ? (
           <form onSubmit={handleSave} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900">{editing ? 'Edit location' : 'New location'}</h2>
+              <h2 className={'font-semibold text-slate-900'}>
+                {editing ? 'Edit location' : 'New location'}
+              </h2>
               <button type="button" onClick={closeForm} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            {error && <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+            {error && (
+              <div className={'mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700'}>{error}</div>
+            )}
             <div className="space-y-3">
               <label className="block">
                 <span className="text-xs font-semibold text-slate-500">Name *</span>
@@ -176,7 +180,9 @@ export function LocationsPanel() {
                     products.map((p) => (
                       <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
                         <input type="checkbox" checked={assignedIds.includes(p.id)} onChange={() => toggleProduct(p.id)} className="rounded border-slate-300 text-indigo-600" />
-                        <span className="min-w-0 flex-1 truncate">{p.name} <span className="text-xs text-slate-400">({p.sku})</span></span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {p.name} <span className="text-xs text-slate-400">({p.sku})</span>
+                        </span>
                       </label>
                     ))
                   )}
