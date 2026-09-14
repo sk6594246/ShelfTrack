@@ -95,6 +95,12 @@ export function setProductsForLocation(locationId: string, productIds: string[])
   saveLocal(LOCATION_PRODUCTS_KEY, next);
 }
 
+export function getLocationsForProduct(productId: string): string[] {
+  return loadLocal<LocationProduct[]>(LOCATION_PRODUCTS_KEY, [])
+    .filter((lp) => lp.productId === productId)
+    .map((lp) => lp.locationId);
+}
+
 export function getCategories(): Category[] {
   return loadLocal<Category[]>(CATEGORIES_KEY, []).sort((a, b) =>
     a.name.localeCompare(b.name)
