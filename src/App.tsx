@@ -7,6 +7,7 @@ import { ProductDetail } from './pages/ProductDetail';
 import { ProductForm } from './pages/ProductForm';
 import { Settings } from './pages/settings/Settings';
 import { QRMapping } from './pages/settings/QRMapping';
+import { Masters } from './pages/masters/Masters';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="scan" element={<Scan />} />
+          <Route path="masters" element={<Masters />} />
           <Route path="products/new" element={<ProductForm />} />
           <Route path="products/:id" element={<ProductDetail />} />
           <Route path="products/:id/edit" element={<ProductForm />} />
