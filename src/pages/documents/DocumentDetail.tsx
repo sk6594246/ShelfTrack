@@ -183,12 +183,16 @@ export function DocumentDetail() {
         <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-slate-400">Created</dt>
-            <dd className="font-medium text-slate-800">{new Date(doc.createdAt).toLocaleString()}</dd>
+            <dd className={'font-medium text-slate-800'}>
+              {new Date(doc.createdAt).toLocaleString()}
+            </dd>
           </div>
           {doc.postedAt && (
             <div>
               <dt className="text-xs text-slate-400">Posted</dt>
-              <dd className="font-medium text-slate-800">{new Date(doc.postedAt).toLocaleString()}</dd>
+              <dd className={'font-medium text-slate-800'}>
+                {new Date(doc.postedAt).toLocaleString()}
+              </dd>
             </div>
           )}
         </dl>
@@ -217,7 +221,9 @@ export function DocumentDetail() {
         </div>
 
         <div className="mt-4 hidden print:block">
-          <p className="text-xs text-slate-400">{isPurchase ? 'Supplier' : 'Customer'}</p>
+          <p className="text-xs text-slate-400">
+            {isPurchase ? 'Supplier' : 'Customer'}
+          </p>
           <p className="font-medium text-slate-900">
             {partners.find((p) => p.id === doc.partnerId)?.name || '—'}
           </p>
@@ -282,12 +288,26 @@ export function DocumentDetail() {
             <select value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
               <option value="">Select product…</option>
               {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({p.sku}) — stock {p.quantity}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.sku}) — stock {p.quantity}
+                </option>
               ))}
             </select>
             <div className="flex gap-2">
-              <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-              <input type="text" placeholder="Line note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+              <input
+                type="number"
+                min={1}
+                value={qty}
+                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              />
+              <input
+                type="text"
+                placeholder="Line note (optional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              />
               <button type="submit" className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
                 <Plus className="h-4 w-4" /> Add
               </button>
@@ -296,11 +316,18 @@ export function DocumentDetail() {
         )}
 
         {error && (
-          <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 print:hidden">{error}</div>
+          <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 print:hidden">
+            {error}
+          </div>
         )}
 
         {!isPosted && (
-          <button type="button" onClick={handlePost} disabled={busy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 print:hidden">
+          <button
+            type="button"
+            onClick={handlePost}
+            disabled={busy}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 print:hidden"
+          >
             <CheckCircle2 className="h-4 w-4" />
             {busy ? 'Posting…' : 'Post document'}
           </button>
