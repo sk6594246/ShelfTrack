@@ -16,13 +16,18 @@ import {
   postDocument,
   deleteDocument,
 } from '../../store/documentsStore';
-import { getPartners } from '../../store/mastersStore';
+import { getPartners, getLocationById } from '../../store/mastersStore';
 import { getProducts } from '../../store/inventoryStore';
+import {
+  getAssignedLocationsForProduct,
+  getFifoLocationsForProduct,
+} from '../../store/stockBatchStore';
 import type {
   InventoryDocument,
   DocumentLine,
   Product,
   BusinessPartner,
+  Location,
 } from '../../types/inventory';
 
 export function DocumentDetail() {
@@ -35,6 +40,7 @@ export function DocumentDetail() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [productId, setProductId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState('');
 
@@ -62,6 +68,28 @@ export function DocumentDetail() {
     products.forEach((p) => m.set(p.id, p));
     return m;
   }, [products]);
+
+  const locationOptions = useMemo(() => {
+    if (!productId || !doc) {
+      return [] as { id: string; label: string; location: Location }[];
+    }
+    if (doc.type === 'purchase') {
+      return getAssignedLocationsForProduct(productId).map((loc) => ({
+        id: loc.id,
+        location: loc,
+        label: loc.code ? `${loc.name} (${loc.code})` : loc.name,
+      }));
+    }
+    return getFifoLocationsForProduct(productId).map((row) => ({
+      id: row.location.id,
+      location: row.location,
+      label: `${row.location.code ? row.location.code + ' · ' : ''}${row.location.name} — ${row.available} avail (FIFO)`,
+    }));
+  }, [productId, doc]);
+
+  useEffect(() => {
+    setLocationId('');
+  }, [productId, doc?.type]);
 
   if (!doc) {
     return (
@@ -95,8 +123,10 @@ export function DocumentDetail() {
     setError(null);
     try {
       if (!productId) throw new Error('Select a product');
-      addLine(doc.id, productId, qty, notes || undefined);
+      if (!locationId) throw new Error('Select a location');
+      addLine(doc.id, productId, qty, locationId, notes || undefined);
       setProductId('');
+      setLocationId('');
       setQty(1);
       setNotes('');
       reload();
@@ -169,7 +199,7 @@ export function DocumentDetail() {
             <h1 className="text-xl font-bold text-slate-900">
               {isPurchase ? 'Purchase' : 'Sale'} document
             </h1>
-            <p className={'font-mono text-xs text-slate-400'}>{doc.id}</p>
+            <p className="font-mono text-xs text-slate-400">{doc.id}</p>
           </div>
           <span
             className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
@@ -183,14 +213,14 @@ export function DocumentDetail() {
         <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-xs text-slate-400">Created</dt>
-            <dd className={'font-medium text-slate-800'}>
+            <dd className="font-medium text-slate-800">
               {new Date(doc.createdAt).toLocaleString()}
             </dd>
           </div>
           {doc.postedAt && (
             <div>
               <dt className="text-xs text-slate-400">Posted</dt>
-              <dd className={'font-medium text-slate-800'}>
+              <dd className="font-medium text-slate-800">
                 {new Date(doc.postedAt).toLocaleString()}
               </dd>
             </div>
@@ -240,9 +270,7 @@ export function DocumentDetail() {
           />
         </div>
         {doc.notes ? (
-          <p className="mt-3 hidden text-sm text-slate-600 print:block">
-            {doc.notes}
-          </p>
+          <p className="mt-3 hidden text-sm text-slate-600 print:block">{doc.notes}</p>
         ) : null}
 
         <h2 className="mt-6 text-sm font-semibold text-slate-700">Line items</h2>
@@ -251,7 +279,7 @@ export function DocumentDetail() {
             <thead>
               <tr className="border-b border-slate-100 text-xs uppercase text-slate-400">
                 <th className="py-2 pr-2 font-semibold">Product</th>
-                <th className="py-2 pr-2 font-semibold">SKU</th>
+                <th className="py-2 pr-2 font-semibold">Location</th>
                 <th className="py-2 pr-2 text-right font-semibold">Qty</th>
                 {!isPosted && <th className="py-2 print:hidden" />}
               </tr>
@@ -264,13 +292,17 @@ export function DocumentDetail() {
               ) : (
                 lines.map((line) => {
                   const p = productMap.get(line.productId);
+                  const loc = line.locationId ? getLocationById(line.locationId) : undefined;
                   return (
                     <tr key={line.id} className="border-b border-slate-50">
                       <td className="py-2.5 pr-2 font-medium text-slate-900">
                         {p?.name || 'Unknown'}
+                        <span className="mt-0.5 block font-mono text-[10px] text-slate-400">
+                          {p?.sku}
+                        </span>
                       </td>
-                      <td className="py-2.5 pr-2 font-mono text-xs text-slate-500">
-                        {p?.sku || '—'}
+                      <td className="py-2.5 pr-2 text-slate-600">
+                        {loc ? (loc.code ? `${loc.name} (${loc.code})` : loc.name) : '—'}
                       </td>
                       <td className="py-2.5 pr-2 text-right font-semibold text-slate-800">
                         {line.quantity}
@@ -293,7 +325,11 @@ export function DocumentDetail() {
         {!isPosted && (
           <form onSubmit={handleAddLine} className="mt-4 space-y-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 print:hidden">
             <p className="text-xs font-semibold text-slate-500">Add line</p>
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+            <select
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
               <option value="">Select product…</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -301,6 +337,37 @@ export function DocumentDetail() {
                 </option>
               ))}
             </select>
+
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              disabled={!productId}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:bg-slate-100"
+            >
+              <option value="">
+                {!productId
+                  ? 'Select product first…'
+                  : isPurchase
+                    ? 'Put-away location (assigned)…'
+                    : 'Pick location (FIFO rank)…'}
+              </option>
+              {locationOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+            {productId && locationOptions.length === 0 && (
+              <p className="text-xs text-amber-600">
+                {isPurchase ? (
+                  <>
+                    No locations assigned to this product.{' '}
+                    <Link to="/masters" className="underline">Assign in Masters → Locations</Link>
+                  </>
+                ) : (
+                  <>No FIFO stock at any location yet. Post a purchase with a location first.</>
+                )}
+              </p>
+            )}
+
             <div className="flex gap-2">
               <input
                 type="number"
