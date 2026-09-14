@@ -26,24 +26,21 @@ export interface Product {
 export interface StockMovement {
   id: string;
   productId: string;
-  change: number; // positive = in, negative = out
+  change: number;
   reason?: string;
   createdAt: string;
 }
 
 export type QRMappingConfig = {
-  /** Field used to look up an existing product */
   primaryLookupField: ProductField;
-  /** Fields that will be pre-filled when creating a new product from a scan */
   fillFields: ProductField[];
-  /** How to interpret the QR payload */
   payloadParser: 'plain' | 'json';
 };
 
 export const DEFAULT_QR_MAPPING: QRMappingConfig = {
   primaryLookupField: 'sku',
   fillFields: ['sku', 'barcode'],
-  payloadParser: 'plain',
+  payloadParser: 'json',
 };
 
 export const PRODUCT_FIELD_LABELS: Record<ProductField, string> = {
@@ -65,3 +62,62 @@ export const ALL_PRODUCT_FIELDS: ProductField[] = [
   'location',
   'notes',
 ];
+
+export interface Location {
+  id: string;
+  name: string;
+  code?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PartnerRole = 'supplier' | 'customer';
+
+export interface BusinessPartner {
+  id: string;
+  name: string;
+  code?: string;
+  roles: PartnerRole[];
+  phone?: string;
+  email?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocationProduct {
+  locationId: string;
+  productId: string;
+}
+
+export interface PartnerProduct {
+  partnerId: string;
+  productId: string;
+  role: PartnerRole;
+}
+
+export type ProductQRPayload = {
+  type: 'product';
+  id: string;
+  sku: string;
+  name: string;
+  barcode?: string;
+  customId?: string;
+  category?: string;
+};
+
+export type LocationQRPayload = {
+  type: 'location';
+  id: string;
+  name: string;
+  code?: string;
+};
