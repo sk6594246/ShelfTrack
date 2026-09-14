@@ -141,7 +141,7 @@ function DocumentRow({ doc }: { doc: InventoryDocument }) {
             {partner?.name || 'No partner'} · {new Date(doc.createdAt).toLocaleString()}
           </p>
         </div>
-        <span className="font-mono text-[10px] text-slate-300">{doc.id.slice(0, 8)}</span>
+        <span className={'font-mono text-[10px] text-slate-300'}>{doc.id.slice(0, 8)}</span>
       </Link>
     </li>
   );

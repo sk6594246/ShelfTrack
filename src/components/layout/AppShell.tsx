@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Home, Package, QrCode, Settings, Database } from 'lucide-react';
+import { Home, Package, QrCode, Settings, Database, FileText } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home, end: true },
   { to: '/inventory', label: 'Inventory', icon: Package },
+  { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/scan', label: 'Scan', icon: QrCode },
   { to: '/masters', label: 'Masters', icon: Database },
   { to: '/settings', label: 'Settings', icon: Settings },
@@ -74,7 +75,7 @@ export function AppShell() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `relative flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition ${
+                `relative flex min-w-[48px] flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold transition ${
                   isActive ? 'text-indigo-600' : 'text-slate-500'
                 }`
               }
