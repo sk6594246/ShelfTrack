@@ -199,7 +199,9 @@ export function DocumentDetail() {
             <h1 className="text-xl font-bold text-slate-900">
               {isPurchase ? 'Purchase' : 'Sale'} document
             </h1>
-            <p className="font-mono text-xs text-slate-400">{doc.id}</p>
+            <p className="font-mono text-xs text-slate-400">
+              {doc.id}
+            </p>
           </div>
           <span
             className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${
@@ -270,7 +272,9 @@ export function DocumentDetail() {
           />
         </div>
         {doc.notes ? (
-          <p className="mt-3 hidden text-sm text-slate-600 print:block">{doc.notes}</p>
+          <p className="mt-3 hidden text-sm text-slate-600 print:block">
+            {doc.notes}
+          </p>
         ) : null}
 
         <h2 className="mt-6 text-sm font-semibold text-slate-700">Line items</h2>
