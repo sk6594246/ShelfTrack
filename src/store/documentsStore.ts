@@ -5,6 +5,11 @@ import type {
   DocumentType,
 } from '../types/inventory';
 import { adjustStock, getProductById } from './inventoryStore';
+import {
+  receiveBatch,
+  issueFromLocation,
+  getAvailableQtyAtLocation,
+} from './stockBatchStore';
 
 const DOCS_KEY = 'inventory_documents';
 const LINES_KEY = 'inventory_document_lines';
@@ -49,7 +54,9 @@ export function createDocument(type: DocumentType): InventoryDocument {
 
 export function updateDocument(
   id: string,
-  patch: Partial<Pick<InventoryDocument, 'partnerId' | 'notes' | 'status' | 'postedAt'>>
+  patch: Partial<
+    Pick<InventoryDocument, 'partnerId' | 'notes' | 'status' | 'postedAt'>
+  >
 ): InventoryDocument {
   const list = loadLocal<InventoryDocument[]>(DOCS_KEY, []);
   const idx = list.findIndex((d) => d.id === id);
@@ -89,18 +96,21 @@ export function addLine(
   documentId: string,
   productId: string,
   quantity: number,
+  locationId: string,
   notes?: string
 ): DocumentLine {
   const doc = getDocumentById(documentId);
   if (!doc) throw new Error('Document not found');
   if (doc.status === 'posted') throw new Error('Document is posted');
   if (quantity <= 0) throw new Error('Quantity must be positive');
+  if (!locationId) throw new Error('Location is required');
 
   const line: DocumentLine = {
     id: uuidv4(),
     documentId,
     productId,
     quantity,
+    locationId,
     notes: notes?.trim() || undefined,
   };
   const lines = loadLocal<DocumentLine[]>(LINES_KEY, []);
@@ -112,7 +122,9 @@ export function addLine(
 
 export function updateLine(
   lineId: string,
-  patch: Partial<Pick<DocumentLine, 'quantity' | 'notes' | 'productId'>>
+  patch: Partial<
+    Pick<DocumentLine, 'quantity' | 'notes' | 'productId' | 'locationId'>
+  >
 ): DocumentLine {
   const lines = loadLocal<DocumentLine[]>(LINES_KEY, []);
   const idx = lines.findIndex((l) => l.id === lineId);
@@ -149,6 +161,12 @@ export async function postDocument(id: string): Promise<InventoryDocument> {
   const lines = getLines(id);
   if (lines.length === 0) throw new Error('Add at least one line item');
 
+  for (const line of lines) {
+    if (!line.locationId) {
+      throw new Error('Every line must have a location');
+    }
+  }
+
   if (doc.type === 'sale') {
     for (const line of lines) {
       const product = await getProductById(line.productId);
@@ -156,6 +174,12 @@ export async function postDocument(id: string): Promise<InventoryDocument> {
       if (product.quantity < line.quantity) {
         throw new Error(
           `Insufficient stock for ${product.name}: have ${product.quantity}, need ${line.quantity}`
+        );
+      }
+      const atLoc = getAvailableQtyAtLocation(line.productId, line.locationId!);
+      if (atLoc < line.quantity) {
+        throw new Error(
+          `Insufficient stock at location for ${product.name}: have ${atLoc}, need ${line.quantity}`
         );
       }
     }
@@ -168,6 +192,18 @@ export async function postDocument(id: string): Promise<InventoryDocument> {
         ? `Purchase ${doc.id.slice(0, 8)}`
         : `Sale ${doc.id.slice(0, 8)}`;
     await adjustStock(line.productId, change, reason);
+
+    if (doc.type === 'purchase') {
+      receiveBatch({
+        productId: line.productId,
+        locationId: line.locationId!,
+        quantity: line.quantity,
+        documentId: doc.id,
+        documentLineId: line.id,
+      });
+    } else {
+      issueFromLocation(line.productId, line.locationId!, line.quantity);
+    }
   }
 
   return updateDocument(id, {
