@@ -122,8 +122,8 @@ export type LocationQRPayload = {
   code?: string;
 };
 
-export type DocumentType = 'purchase' | 'sale';
-export type DocumentStatus = 'draft' | 'posted';
+export type DocumentType = 'purchase' | 'sale' | 'transfer';
+export type DocumentStatus = 'draft' | 'posted' | 'reversed';
 
 export interface InventoryDocument {
   id: string;
@@ -134,6 +134,9 @@ export interface InventoryDocument {
   createdAt: string;
   updatedAt: string;
   postedAt?: string;
+  reversedAt?: string;
+  reversesDocumentId?: string;
+  reversedByDocumentId?: string;
 }
 
 export interface DocumentLine {
@@ -142,6 +145,8 @@ export interface DocumentLine {
   productId: string;
   quantity: number;
   locationId?: string;
+  fromLocationId?: string;
+  toLocationId?: string;
   notes?: string;
 }
 
