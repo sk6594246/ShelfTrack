@@ -132,7 +132,9 @@ export function ProductDetail() {
                   </span>
                   {m.reason && <span className={'ml-2 text-slate-500'}>{m.reason}</span>}
                 </div>
-                <span className="text-xs text-slate-400">{new Date(m.createdAt).toLocaleString()}</span>
+                <span className={'text-xs text-slate-400'}>
+                  {new Date(m.createdAt).toLocaleString()}
+                </span>
               </li>
             ))}
           </ul>
