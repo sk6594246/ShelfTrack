@@ -76,7 +76,7 @@ export function QRPrintModal({
             width={224}
             height={224}
           />
-          <p className="mt-3 text-base font-semibold text-slate-900">{title}</p>
+          <p className={'mt-3 text-base font-semibold text-slate-900'}>{title}</p>
           {subtitle && (
             <p className={'mt-0.5 font-mono text-sm text-slate-500'}>{subtitle}</p>
           )}
@@ -91,14 +91,14 @@ export function QRPrintModal({
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             <Download className="h-4 w-4" />
-            Download
+            <span>Download</span>
           </button>
           <button
             onClick={handlePrint}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
           >
             <Printer className="h-4 w-4" />
-            Print
+            <span>Print</span>
           </button>
         </div>
       </div>
