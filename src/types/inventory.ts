@@ -121,3 +121,26 @@ export type LocationQRPayload = {
   name: string;
   code?: string;
 };
+
+export type DocumentType = 'purchase' | 'sale';
+export type DocumentStatus = 'draft' | 'posted';
+
+export interface InventoryDocument {
+  id: string;
+  type: DocumentType;
+  partnerId?: string;
+  status: DocumentStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  postedAt?: string;
+}
+
+export interface DocumentLine {
+  id: string;
+  documentId: string;
+  productId: string;
+  quantity: number;
+  locationId?: string;
+  notes?: string;
+}
