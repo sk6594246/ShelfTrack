@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useProducts, useProduct } from '../hooks/useProducts';
+import { useLocations } from '../hooks/useLocations';
 import type { Product } from '../types/inventory';
 import { CATEGORIES } from '../types/inventory';
 
@@ -36,10 +37,12 @@ export function ProductForm() {
   const location = useLocation();
   const { createOrUpdate } = useProducts();
   const { product, loading } = useProduct(id);
+  const { locations: allLocations, loading: locationsLoading } = useLocations();
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCustomLocationInput, setShowCustomLocationInput] = useState(false);
 
   // Prefill from navigation state (coming from Scan) or existing product
   useEffect(() => {
@@ -197,13 +200,61 @@ export function ProductForm() {
               ))}
             </select>
           </Field>
-          <Field label="Location (optional)">
-            <input
-              value={form.location}
-              onChange={(e) => update('location', e.target.value)}
-              className="input"
-              placeholder="Shelf A1 (optional)"
-            />
+          <Field label="Location">
+            {/* Get unique locations, including current form.location if not in list */}
+            {(() => {
+              const locationOptions = Array.from(new Set([
+                ...allLocations,
+                ...(form.location && !allLocations.includes(form.location) ? [form.location] : [])
+              ]));
+
+              return (
+                <>
+                  {showCustomLocationInput ? (
+                    <>
+                      <input
+                        value={form.location}
+                        onChange={(e) => update('location', e.target.value)}
+                        className="input"
+                        placeholder="Enter custom location"
+                      />
+                      <button
+                        onClick={() => setShowCustomLocationInput(false)}
+                        className="mt-2 text-xs text-indigo-600"
+                      >
+                        Choose from list
+                      </button>
+                    </>
+                  ) : (
+                    <select
+                      value={form.location}
+                      onChange={(e) => {
+                        if (e.target.value === '__custom__') {
+                          setShowCustomLocationInput(true);
+                          return;
+                        }
+                        update('location', e.target.value as string);
+                      }}
+                      className="select"
+                    >
+                      <option value="">Select location</option>
+                      {locationsLoading ? (
+                        <option>Loading locations...</option>
+                      ) : (
+                        <>
+                          {locationOptions.map((location: string) => (
+                            <option key={location} value={location}>
+                              {location || 'Unassigned'}
+                            </option>
+                          ))}
+                          <option value="__custom__">Enter custom location...</option>
+                        </>
+                      )}
+                    </select>
+                  )}
+                </>
+              );
+            })()}
           </Field>
         </div>
 

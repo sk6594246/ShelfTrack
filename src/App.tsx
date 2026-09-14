@@ -5,6 +5,7 @@ import { Inventory } from './pages/Inventory';
 import { Scan } from './pages/Scan';
 import { ProductDetail } from './pages/ProductDetail';
 import { ProductForm } from './pages/ProductForm';
+import { Master } from './pages/Master';
 import { Settings } from './pages/settings/Settings';
 import { QRMapping } from './pages/settings/QRMapping';
 import { LocationMaster } from './pages/LocationMaster';
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="products/:id/edit" element={<ProductForm />} />
           <Route path="products/:id/qr" element={<GenerateQR />} />
           <Route path="location-master/qr" element={<GenerateQR />} />
+          <Route path="master" element={<Master />} />
           <Route path="settings" element={<Settings />} />
           <Route path="settings/qr-mapping" element={<QRMapping />} />
           <Route path="location-master" element={<LocationMaster />} />
