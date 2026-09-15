@@ -41,6 +41,7 @@ type CellShelf = {
   location: Location;
   qty: number;
   firstGr: string | null;
+  earliestExpiry: string | null;
   assigned: boolean;
 };
 
@@ -82,11 +83,26 @@ export function StockMap() {
       const qty = getAvailableQtyAtLocation(productId, loc.id);
       const assigned = assignedIds.has(loc.id);
       const firstGr = qty > 0 ? firstGrDate(productId, loc.id) : null;
+      let earliestExpiry: string | null = null;
+      if (qty > 0) {
+        const exp = getBatches()
+          .filter(
+            (b) =>
+              b.productId === productId &&
+              b.locationId === loc.id &&
+              b.remaining > 0 &&
+              b.expiryDate
+          )
+          .map((b) => b.expiryDate!)
+          .sort();
+        earliestExpiry = exp[0] || null;
+      }
       const list = map.get(key) || [];
       list.push({
         location: loc,
         qty,
         firstGr,
+        earliestExpiry,
         assigned,
       });
       map.set(key, list);
@@ -261,12 +277,19 @@ export function StockMap() {
                                         ? 'bg-indigo-500'
                                         : 'bg-slate-300'
                                     }`}
-                                    style={{ width: `${s.qty > 0 ? Math.max(fill, 8) : 0}%` }}
+                                    style={{
+                                      width: `${s.qty > 0 ? Math.max(fill, 8) : 0}%`,
+                                    }}
                                   />
                                 </div>
                                 {s.firstGr && (
                                   <p className="mt-0.5 text-[9px] text-slate-400">
                                     GR {formatDate(s.firstGr)}
+                                  </p>
+                                )}
+                                {s.earliestExpiry && (
+                                  <p className="mt-0.5 text-[9px] font-medium text-amber-600">
+                                    Exp {formatDate(s.earliestExpiry)}
                                   </p>
                                 )}
                               </div>
