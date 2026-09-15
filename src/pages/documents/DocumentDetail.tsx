@@ -28,6 +28,7 @@ import { getProducts } from '../../store/inventoryStore';
 import {
   getAssignedLocationsForProduct,
   getFifoLocationsForProduct,
+  getFefoLocationsForProduct,
   getUnlocatedQty,
 } from '../../store/stockBatchStore';
 import type {
@@ -102,9 +103,15 @@ export function DocumentDetail() {
         label: loc.code ? `${loc.name} (${loc.code})` : loc.name,
       }));
     }
-    return getFifoLocationsForProduct(productId).map((row) => ({
+    const fefo = getFefoLocationsForProduct(productId);
+    const useFefo = fefo.some((r) => r.earliestExpiry);
+    const rows = useFefo ? fefo : getFifoLocationsForProduct(productId);
+    return rows.map((row) => ({
       id: row.location.id,
-      label: `${row.location.name} — ${row.available} avail (FIFO)`,
+      label:
+        useFefo && 'earliestExpiry' in row && row.earliestExpiry
+          ? `${row.location.name} — ${row.available} (FEFO exp ${row.earliestExpiry})`
+          : `${row.location.name} — ${row.available} avail (FIFO)`,
     }));
   }, [productId, doc]);
 
@@ -182,9 +189,7 @@ export function DocumentDetail() {
     try {
       if (!productId) throw new Error('Select a product');
       if (isTransfer) {
-        if (!fromLocationId || !toLocationId) {
-          throw new Error('Select from and to locations');
-        }
+        if (!fromLocationId || !toLocationId) throw new Error('Select from and to locations');
         addLine(doc.id, {
           productId,
           quantity: qty,
@@ -277,7 +282,7 @@ export function DocumentDetail() {
             <Printer className="h-5 w-5" />
           </button>
           {canReverse && (
-            <button type="button" onClick={handleReverse} disabled={busy} className="rounded-lg p-2 text-amber-600 hover:bg-amber-50" title="Reverse document">
+            <button type="button" onClick={handleReverse} disabled={busy} className="rounded-lg p-2 text-amber-600 hover:bg-amber-50" title="Reverse">
               <Undo2 className="h-5 w-5" />
             </button>
           )}
@@ -373,7 +378,7 @@ export function DocumentDetail() {
                         <td className="px-3 py-2 text-right font-semibold tabular-nums">{line.quantity}</td>
                         {isDraft && (
                           <td className="px-3 py-2 print:hidden">
-                            <button type="button" onClick={() => handleRemoveLine(line.id)} className="text-rose-500 hover:underline text-xs">Remove</button>
+                            <button type="button" onClick={() => handleRemoveLine(line.id)} className="text-xs text-rose-500 hover:underline">Remove</button>
                           </td>
                         )}
                       </tr>
@@ -391,8 +396,7 @@ export function DocumentDetail() {
             {error && <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
             <label className="block">
               <span className="text-[10px] font-semibold uppercase text-slate-400">Product *</span>
-              <select value={productId} onChange={(e) => setProductId(e.target.value)}
-                className="mt-0.5 w-full appearance-auto rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
+              <select value={productId} onChange={(e) => setProductId(e.target.value)} className="mt-0.5 w-full appearance-auto rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
                 <option value="">Select product…</option>
                 {productOptions.map((p) => (
                   <option key={p.id} value={p.id}>{p.name} ({p.sku}) — stock {p.quantity}</option>
@@ -423,32 +427,23 @@ export function DocumentDetail() {
                   </select>
                 </label>
                 {productId && fromLocationOptions.length === 0 && (
-                  <p className="text-xs text-amber-600">No location stock and no unlocated qty. Raise product stock or post a purchase first.</p>
+                  <p className="text-xs text-amber-600">No location stock and no unlocated qty.</p>
                 )}
               </>
             ) : (
               <>
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">
-                    {isPurchase ? 'Put-away location *' : 'Pick location (FIFO) *'}
+                    {isPurchase ? 'Put-away location *' : 'Pick location (FEFO/FIFO) *'}
                   </span>
                   <select value={locationId} onChange={(e) => setLocationId(e.target.value)} disabled={!productId}
                     className="mt-0.5 w-full appearance-auto rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:bg-slate-100">
-                    <option value="">{!productId ? 'Select product first…' : isPurchase ? 'Put-away location…' : 'Pick location (FIFO)…'}</option>
+                    <option value="">{!productId ? 'Select product first…' : isPurchase ? 'Put-away…' : 'Pick location…'}</option>
                     {locationOptions.map((o) => (
                       <option key={o.id} value={o.id}>{o.label}</option>
                     ))}
                   </select>
                 </label>
-                {productId && locationOptions.length === 0 && (
-                  <p className="text-xs text-amber-600">
-                    {isPurchase ? (
-                      <>No locations assigned. <Link to="/masters" className="underline">Masters → Locations</Link></>
-                    ) : (
-                      <>No FIFO stock yet. Post a purchase first.</>
-                    )}
-                  </p>
-                )}
               </>
             )}
 
@@ -456,27 +451,22 @@ export function DocumentDetail() {
               <div className="grid grid-cols-3 gap-2">
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">Purchase date</span>
-                  <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)}
-                    className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
+                  <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
                 </label>
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">Mfg date</span>
-                  <input type="date" value={mfgDate} onChange={(e) => setMfgDate(e.target.value)}
-                    className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
+                  <input type="date" value={mfgDate} onChange={(e) => setMfgDate(e.target.value)} className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
                 </label>
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">Expiry date</span>
-                  <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-                    className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
+                  <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="mt-0.5 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm" />
                 </label>
               </div>
             )}
 
             <div className="flex gap-2">
-              <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-                className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
-              <input type="text" placeholder="Line note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+              <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
+              <input type="text" placeholder="Line note (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" />
               <button type="submit" className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
                 <Plus className="h-4 w-4" /> Add
               </button>
@@ -484,11 +474,17 @@ export function DocumentDetail() {
           </form>
         )}
 
-        {error && !isDraft && <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
-
         {isDraft && (
           <div className="mt-5 print:hidden">
             {error && <div className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+            {(doc.type === 'sale' || doc.type === 'transfer') && lines.length > 0 && (
+              <Link
+                to={`/pick?doc=${doc.id}`}
+                className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+              >
+                Open pick list (walk path)
+              </Link>
+            )}
             <button type="button" onClick={handlePost} disabled={busy}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
               <CheckCircle2 className="h-4 w-4" /> {busy ? 'Posting…' : 'Post document'}
