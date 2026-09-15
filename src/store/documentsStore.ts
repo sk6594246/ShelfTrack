@@ -4,11 +4,13 @@ import type {
   DocumentLine,
   DocumentType,
 } from '../types/inventory';
+import { UNLOCATED_LOCATION_ID } from '../types/inventory';
 import { adjustStock, resolveProduct } from './inventoryStore';
 import {
   receiveBatch,
   issueFromLocation,
   getAvailableQtyAtLocation,
+  getUnlocatedQty,
 } from './stockBatchStore';
 
 const DOCS_KEY = 'inventory_documents';
@@ -110,6 +112,9 @@ export type AddLineInput = {
   fromLocationId?: string;
   toLocationId?: string;
   notes?: string;
+  purchaseDate?: string;
+  mfgDate?: string;
+  expiryDate?: string;
 };
 
 export function addLine(documentId: string, input: AddLineInput): DocumentLine {
@@ -121,7 +126,10 @@ export function addLine(documentId: string, input: AddLineInput): DocumentLine {
   if (doc.type === 'transfer') {
     if (!input.fromLocationId) throw new Error('From location is required');
     if (!input.toLocationId) throw new Error('To location is required');
-    if (input.fromLocationId === input.toLocationId) {
+    if (
+      input.fromLocationId !== UNLOCATED_LOCATION_ID &&
+      input.fromLocationId === input.toLocationId
+    ) {
       throw new Error('From and to locations must differ');
     }
   } else {
@@ -137,6 +145,9 @@ export function addLine(documentId: string, input: AddLineInput): DocumentLine {
     fromLocationId: input.fromLocationId,
     toLocationId: input.toLocationId,
     notes: input.notes?.trim() || undefined,
+    purchaseDate: input.purchaseDate || undefined,
+    mfgDate: input.mfgDate || undefined,
+    expiryDate: input.expiryDate || undefined,
   };
   const lines = loadLocal<DocumentLine[]>(LINES_KEY, []);
   lines.push(line);
@@ -198,6 +209,9 @@ async function applyPostEffects(
           quantity: line.quantity,
           documentId: doc.id,
           documentLineId: line.id,
+          purchaseDate: line.purchaseDate,
+          mfgDate: line.mfgDate,
+          expiryDate: line.expiryDate,
         });
       } else {
         issueFromLocation(product.id, line.locationId!, line.quantity);
@@ -223,24 +237,35 @@ async function applyPostEffects(
         });
       }
     } else if (doc.type === 'transfer') {
+      const fromUnlocated = line.fromLocationId === UNLOCATED_LOCATION_ID;
       if (direction === 1) {
-        issueFromLocation(product.id, line.fromLocationId!, line.quantity);
+        if (!fromUnlocated) {
+          issueFromLocation(product.id, line.fromLocationId!, line.quantity);
+        }
         receiveBatch({
           productId: product.id,
           locationId: line.toLocationId!,
           quantity: line.quantity,
           documentId: doc.id,
           documentLineId: line.id,
+          purchaseDate: line.purchaseDate,
+          mfgDate: line.mfgDate,
+          expiryDate: line.expiryDate,
         });
       } else {
         issueFromLocation(product.id, line.toLocationId!, line.quantity);
-        receiveBatch({
-          productId: product.id,
-          locationId: line.fromLocationId!,
-          quantity: line.quantity,
-          documentId: doc.id,
-          documentLineId: line.id,
-        });
+        if (!fromUnlocated) {
+          receiveBatch({
+            productId: product.id,
+            locationId: line.fromLocationId!,
+            quantity: line.quantity,
+            documentId: doc.id,
+            documentLineId: line.id,
+            purchaseDate: line.purchaseDate,
+            mfgDate: line.mfgDate,
+            expiryDate: line.expiryDate,
+          });
+        }
       }
     }
   }
@@ -273,12 +298,23 @@ async function validateStockForPost(
   if (doc.type === 'transfer') {
     for (const line of lines) {
       const product = await resolveProduct(line.productId);
-      const pid = product?.id || line.productId;
-      const atLoc = getAvailableQtyAtLocation(pid, line.fromLocationId!);
-      if (atLoc < line.quantity) {
-        throw new Error(
-          `Insufficient stock at source for ${product?.name || 'product'}: have ${atLoc}, need ${line.quantity}`
-        );
+      if (!product) {
+        throw new Error(`Product not found for line (id: ${line.productId})`);
+      }
+      if (line.fromLocationId === UNLOCATED_LOCATION_ID) {
+        const unloc = getUnlocatedQty(product.id, product.quantity);
+        if (unloc < line.quantity) {
+          throw new Error(
+            `Insufficient unlocated stock for ${product.name}: have ${unloc}, need ${line.quantity}`
+          );
+        }
+      } else {
+        const atLoc = getAvailableQtyAtLocation(product.id, line.fromLocationId!);
+        if (atLoc < line.quantity) {
+          throw new Error(
+            `Insufficient stock at source for ${product.name}: have ${atLoc}, need ${line.quantity}`
+          );
+        }
       }
     }
   }
