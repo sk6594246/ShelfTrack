@@ -70,9 +70,25 @@ export interface Location {
   name: string;
   code?: string;
   notes?: string;
+  /** 1-based grid row on store map */
+  gridRow?: number;
+  /** 1-based grid column on store map */
+  gridCol?: number;
+  /** Shelf level within cell (1 = bottom/first, 2 = second, …) */
+  shelf?: number;
   createdAt: string;
   updatedAt: string;
 }
+
+export interface StoreLayout {
+  rows: number;
+  cols: number;
+}
+
+export const DEFAULT_STORE_LAYOUT: StoreLayout = {
+  rows: 5,
+  cols: 8,
+};
 
 export interface Category {
   id: string;
