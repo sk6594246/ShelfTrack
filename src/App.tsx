@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell';
 import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
 import { Scan } from './pages/Scan';
+import { StockMap } from './pages/StockMap';
 import { ProductDetail } from './pages/ProductDetail';
 import { ProductForm } from './pages/ProductForm';
 import { Settings } from './pages/settings/Settings';
@@ -18,6 +19,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<Dashboard />} />
           <Route path="inventory" element={<Inventory />} />
+          <Route path="stock" element={<StockMap />} />
           <Route path="scan" element={<Scan />} />
           <Route path="masters" element={<Masters />} />
           <Route path="documents" element={<Documents />} />

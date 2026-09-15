@@ -7,6 +7,7 @@ import {
   Database,
   FileText,
   Search,
+  Grid3x3,
 } from 'lucide-react';
 import { CommandPalette } from '../CommandPalette';
 import { ToastHost } from '../ui/Toast';
@@ -14,6 +15,7 @@ import { ToastHost } from '../ui/Toast';
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home, end: true },
   { to: '/inventory', label: 'Inventory', icon: Package },
+  { to: '/stock', label: 'Stock', icon: Grid3x3 },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/scan', label: 'Scan', icon: QrCode },
   { to: '/masters', label: 'Masters', icon: Database },
@@ -97,14 +99,14 @@ export function AppShell() {
       </main>
 
       <nav className="st-safe-bottom fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/90 bg-white/95 backdrop-blur-md md:hidden">
-        <div className="flex h-16 items-center justify-around px-1">
+        <div className="flex h-16 items-center justify-around overflow-x-auto px-1">
           {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
               className={({ isActive }) =>
-                `relative flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition ${
+                `relative flex min-w-[48px] flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-semibold transition ${
                   isActive ? 'text-indigo-600' : 'text-slate-500'
                 }`
               }

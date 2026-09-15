@@ -27,6 +27,12 @@ function saveLocal<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function optionalGrid(n: number | undefined | null): number | undefined {
+  if (n == null || Number.isNaN(Number(n))) return undefined;
+  const v = Math.round(Number(n));
+  return v >= 1 ? v : undefined;
+}
+
 export function getLocations(): Location[] {
   return loadLocal<Location[]>(LOCATIONS_KEY, []).sort((a, b) =>
     a.name.localeCompare(b.name)
@@ -42,11 +48,25 @@ export function saveLocation(
 ): Location {
   const list = loadLocal<Location[]>(LOCATIONS_KEY, []);
   const now = new Date().toISOString();
+  const gridRow = optionalGrid(data.gridRow);
+  const gridCol = optionalGrid(data.gridCol);
+  const shelf = optionalGrid(data.shelf);
 
   if (data.id) {
     const idx = list.findIndex((l) => l.id === data.id);
     if (idx === -1) throw new Error('Location not found');
-    const updated: Location = { ...list[idx], ...data, id: data.id, updatedAt: now };
+    const updated: Location = {
+      ...list[idx],
+      ...data,
+      id: data.id,
+      name: data.name.trim(),
+      code: data.code?.trim() || undefined,
+      notes: data.notes?.trim() || undefined,
+      gridRow,
+      gridCol,
+      shelf,
+      updatedAt: now,
+    };
     list[idx] = updated;
     saveLocal(LOCATIONS_KEY, list);
     return updated;
@@ -56,6 +76,9 @@ export function saveLocation(
     name: data.name.trim(),
     code: data.code?.trim() || undefined,
     notes: data.notes?.trim() || undefined,
+    gridRow,
+    gridCol,
+    shelf,
     id: uuidv4(),
     createdAt: now,
     updatedAt: now,
@@ -235,10 +258,46 @@ export function seedMastersIfEmpty(): void {
   if (getLocations().length === 0) {
     const now = new Date().toISOString();
     saveLocal(LOCATIONS_KEY, [
-      { id: uuidv4(), name: 'Shelf A1', code: 'A1', createdAt: now, updatedAt: now },
-      { id: uuidv4(), name: 'Shelf A2', code: 'A2', createdAt: now, updatedAt: now },
-      { id: uuidv4(), name: 'Shelf B3', code: 'B3', createdAt: now, updatedAt: now },
-      { id: uuidv4(), name: 'Shelf C2', code: 'C2', createdAt: now, updatedAt: now },
+      {
+        id: uuidv4(),
+        name: 'Shelf A1',
+        code: 'A1',
+        gridRow: 1,
+        gridCol: 1,
+        shelf: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: uuidv4(),
+        name: 'Shelf A2',
+        code: 'A2',
+        gridRow: 1,
+        gridCol: 2,
+        shelf: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: uuidv4(),
+        name: 'Shelf B3',
+        code: 'B3',
+        gridRow: 2,
+        gridCol: 3,
+        shelf: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: uuidv4(),
+        name: 'Shelf C2',
+        code: 'C2',
+        gridRow: 3,
+        gridCol: 2,
+        shelf: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
     ]);
   }
   if (getCategories().length === 0) {
