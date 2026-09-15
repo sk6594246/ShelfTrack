@@ -203,7 +203,7 @@ export function DocumentDetail() {
 
   function handleRemoveLine(lineId: string) {
     if (!doc || !isDraft) return;
-    removeLine(doc.id, lineId);
+    removeLine(lineId);
     reload();
   }
 
@@ -212,8 +212,9 @@ export function DocumentDetail() {
     setBusy(true);
     setError(null);
     try {
-      postDocument(doc.id);
+      await postDocument(doc.id);
       reload();
+      getProducts().then(setProducts);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Post failed');
     } finally {
@@ -227,8 +228,9 @@ export function DocumentDetail() {
     setBusy(true);
     setError(null);
     try {
-      reverseDocument(doc.id);
+      await reverseDocument(doc.id);
       reload();
+      getProducts().then(setProducts);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Reverse failed');
     } finally {
