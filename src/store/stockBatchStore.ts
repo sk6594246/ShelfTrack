@@ -80,6 +80,17 @@ export function getAssignedLocationsForProduct(productId: string): Location[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export function getLocatedQtyForProduct(productId: string): number {
+  return getBatches()
+    .filter((b) => b.productId === productId && b.remaining > 0)
+    .reduce((sum, b) => sum + b.remaining, 0);
+}
+
+/** Product header qty minus stock already on any location */
+export function getUnlocatedQty(productId: string, productQuantity: number): number {
+  return Math.max(0, productQuantity - getLocatedQtyForProduct(productId));
+}
+
 export function receiveBatch(input: {
   productId: string;
   locationId: string;
@@ -87,6 +98,9 @@ export function receiveBatch(input: {
   documentId?: string;
   documentLineId?: string;
   receivedAt?: string;
+  purchaseDate?: string;
+  mfgDate?: string;
+  expiryDate?: string;
 }): StockBatch {
   if (input.quantity <= 0) throw new Error('Batch quantity must be positive');
   const batch: StockBatch = {
@@ -98,6 +112,9 @@ export function receiveBatch(input: {
     receivedAt: input.receivedAt || new Date().toISOString(),
     documentId: input.documentId,
     documentLineId: input.documentLineId,
+    purchaseDate: input.purchaseDate || undefined,
+    mfgDate: input.mfgDate || undefined,
+    expiryDate: input.expiryDate || undefined,
   };
   const list = getBatches();
   list.push(batch);
