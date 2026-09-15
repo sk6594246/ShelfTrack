@@ -4,6 +4,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Inventory } from './pages/Inventory';
 import { Scan } from './pages/Scan';
 import { StockMap } from './pages/StockMap';
+import { ReceiveDock } from './pages/ReceiveDock';
+import { PickList } from './pages/PickList';
 import { ProductDetail } from './pages/ProductDetail';
 import { ProductForm } from './pages/ProductForm';
 import { Settings } from './pages/settings/Settings';
@@ -20,6 +22,8 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="stock" element={<StockMap />} />
+          <Route path="receive" element={<ReceiveDock />} />
+          <Route path="pick" element={<PickList />} />
           <Route path="scan" element={<Scan />} />
           <Route path="masters" element={<Masters />} />
           <Route path="documents" element={<Documents />} />
