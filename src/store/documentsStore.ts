@@ -331,8 +331,9 @@ export async function postDocument(id: string): Promise<InventoryDocument> {
   if (doc.status === 'reversed') throw new Error('Document was reversed');
   if (doc.status !== 'draft') throw new Error('Only drafts can be posted');
 
-  if (doc.type !== 'transfer' && !doc.partnerId) {
-    throw new Error('Assign a partner before posting');
+  // Sale requires customer; purchase partner optional (receiving dock)
+  if (doc.type === 'sale' && !doc.partnerId) {
+    throw new Error('Assign a customer before posting');
   }
 
   const lines = getLines(id);
