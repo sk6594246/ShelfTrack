@@ -1,5 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Home, Package, QrCode, Settings, Database, FileText } from 'lucide-react';
+import {
+  Home,
+  Package,
+  QrCode,
+  Settings,
+  Database,
+  FileText,
+  Search,
+} from 'lucide-react';
+import { CommandPalette } from '../CommandPalette';
+import { ToastHost } from '../ui/Toast';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: Home, end: true },
@@ -47,7 +57,9 @@ export function AppShell() {
                   )}
                   <Icon
                     className={`h-5 w-5 shrink-0 transition ${
-                      isActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'
+                      isActive
+                        ? 'text-indigo-600'
+                        : 'text-slate-400 group-hover:text-slate-600'
                     }`}
                     strokeWidth={isActive ? 2.25 : 2}
                   />
@@ -59,7 +71,24 @@ export function AppShell() {
         </nav>
 
         <div className="border-t border-slate-100 p-4">
-          <p className="text-[11px] font-medium text-slate-400">ShelfTrack · local mode</p>
+          <button
+            type="button"
+            onClick={() =>
+              window.dispatchEvent(
+                new KeyboardEvent('keydown', { key: 'k', metaKey: true })
+              )
+            }
+            className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span className="flex-1">Search…</span>
+            <kbd className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 ring-1 ring-slate-200">
+              ⌘K
+            </kbd>
+          </button>
+          <p className="mt-3 text-[11px] font-medium text-slate-400">
+            ShelfTrack · local mode
+          </p>
         </div>
       </aside>
 
@@ -75,7 +104,7 @@ export function AppShell() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `relative flex min-w-[48px] flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[9px] font-semibold transition ${
+                `relative flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-1.5 py-1.5 text-[10px] font-semibold transition ${
                   isActive ? 'text-indigo-600' : 'text-slate-500'
                 }`
               }
@@ -86,7 +115,9 @@ export function AppShell() {
                     <span className="absolute -top-0.5 h-0.5 w-6 rounded-full bg-indigo-600" />
                   )}
                   <Icon
-                    className={`h-5 w-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`}
+                    className={`h-5 w-5 ${
+                      isActive ? 'text-indigo-600' : 'text-slate-400'
+                    }`}
                     strokeWidth={isActive ? 2.4 : 2}
                   />
                   {label}
@@ -96,6 +127,9 @@ export function AppShell() {
           ))}
         </div>
       </nav>
+
+      <CommandPalette />
+      <ToastHost />
     </div>
   );
 }
