@@ -23,8 +23,8 @@ function saveLocal<T>(key: string, value: T) {
 
 /**
  * GAS / Sheets sometimes returns multiple products with the same id.
- * That breaks checkbox assignment (all rows share one identity).
  * When ids collide or are missing, use a stable unique id from sku (+ index).
+ * original backend id is kept as sourceId for GAS write APIs.
  */
 export function normalizeProductIds(products: Product[]): Product[] {
   if (!products.length) return products;
@@ -50,8 +50,30 @@ export function normalizeProductIds(products: Product[]): Product[] {
       next = `${next}-${i}`;
     }
     used.add(next);
-    return { ...p, id: next };
+    return {
+      ...p,
+      id: next,
+      sourceId: raw || p.sourceId || undefined,
+    };
   });
+}
+
+/** Resolve client productId (may be remapped SKU) to a Product */
+export async function resolveProduct(
+  productId: string
+): Promise<Product | undefined> {
+  if (!productId) return undefined;
+  const all = await getProducts();
+  return (
+    all.find((p) => p.id === productId) ||
+    all.find((p) => p.sku === productId) ||
+    all.find((p) => p.sourceId === productId)
+  );
+}
+
+/** Id to send to GAS for writes */
+function gasWriteId(product: Product): string {
+  return product.sourceId || product.id;
 }
 
 // ---------- Products ----------
@@ -64,13 +86,14 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {
-  const all = await getProducts();
-  const found = all.find((p) => p.id === id);
+  const found = await resolveProduct(id);
   if (found) return found;
 
   if (isGasEnabled()) {
     const p = await gas.gasGetProduct(id);
-    return p ?? undefined;
+    if (!p) return undefined;
+    const [normalized] = normalizeProductIds([p as Product]);
+    return normalized;
   }
   return loadLocal<Product[]>(PRODUCTS_KEY, []).find((p) => p.id === id);
 }
@@ -92,7 +115,15 @@ export async function saveProduct(
   product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
 ): Promise<Product> {
   if (isGasEnabled()) {
-    return gas.gasSaveProduct(product);
+    const resolved = product.id ? await resolveProduct(product.id) : undefined;
+    const payload = {
+      ...product,
+      id: resolved ? gasWriteId(resolved) : product.id,
+      sku: product.sku || resolved?.sku,
+    };
+    const saved = await gas.gasSaveProduct(payload);
+    const [normalized] = normalizeProductIds([saved as Product]);
+    return normalized;
   }
 
   const products = loadLocal<Product[]>(PRODUCTS_KEY, []);
@@ -125,7 +156,8 @@ export async function saveProduct(
 
 export async function deleteProduct(id: string): Promise<void> {
   if (isGasEnabled()) {
-    await gas.gasDeleteProduct(id);
+    const resolved = await resolveProduct(id);
+    await gas.gasDeleteProduct(resolved ? gasWriteId(resolved) : id);
     return;
   }
   const products = loadLocal<Product[]>(PRODUCTS_KEY, []).filter((p) => p.id !== id);
@@ -138,7 +170,12 @@ export async function deleteProduct(id: string): Promise<void> {
 
 export async function getMovements(productId?: string): Promise<StockMovement[]> {
   if (isGasEnabled()) {
-    return gas.gasGetMovements(productId);
+    let gasId = productId;
+    if (productId) {
+      const resolved = await resolveProduct(productId);
+      if (resolved) gasId = gasWriteId(resolved);
+    }
+    return gas.gasGetMovements(gasId);
   }
   const all = loadLocal<StockMovement[]>(MOVEMENTS_KEY, []);
   if (productId) {
@@ -154,19 +191,54 @@ export async function adjustStock(
   change: number,
   reason?: string
 ): Promise<Product> {
-  if (isGasEnabled()) {
-    return gas.gasAdjustStock(productId, change, reason);
+  const product = await resolveProduct(productId);
+  if (!product) {
+    throw new Error(
+      `Product not found (id: ${productId}). If using Google Sheets, ensure each product has a unique id or SKU.`
+    );
   }
 
-  const product = await getProductById(productId);
-  if (!product) throw new Error('Product not found');
+  if (isGasEnabled()) {
+    try {
+      const saved = await gas.gasAdjustStock(
+        gasWriteId(product),
+        change,
+        reason,
+        product.sku
+      );
+      const [normalized] = normalizeProductIds([saved as Product]);
+      return normalized;
+    } catch (err: unknown) {
+      // Retry with SKU if backend can resolve by SKU
+      if (product.sku && gasWriteId(product) !== product.sku) {
+        try {
+          const saved = await gas.gasAdjustStock(
+            product.sku,
+            change,
+            reason,
+            product.sku
+          );
+          const [normalized] = normalizeProductIds([saved as Product]);
+          return normalized;
+        } catch {
+          /* fall through */
+        }
+      }
+      const msg = err instanceof Error ? err.message : 'Stock adjust failed';
+      throw new Error(
+        msg.includes('not found')
+          ? `Product not found in Google Sheets for "${product.name}" (sku: ${product.sku}). Fix duplicate/missing ids in the sheet, or adjust stock from Inventory.`
+          : msg
+      );
+    }
+  }
 
   const newQty = Math.max(0, product.quantity + change);
   const updated = await saveProduct({ ...product, quantity: newQty });
 
   const movement: StockMovement = {
     id: uuidv4(),
-    productId,
+    productId: product.id,
     change,
     reason,
     createdAt: new Date().toISOString(),

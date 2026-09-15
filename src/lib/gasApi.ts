@@ -21,7 +21,7 @@ async function gasRequest<T>(
 
   const res = await fetch(GAS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight issues with GAS
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, ...payload }),
     redirect: 'follow',
   });
@@ -68,12 +68,14 @@ export async function gasGetMovements(productId?: string) {
 export async function gasAdjustStock(
   productId: string,
   change: number,
-  reason?: string
+  reason?: string,
+  sku?: string
 ) {
   const data = await gasRequest<{ product: any }>('adjustStock', {
     productId,
     change,
     reason: reason ?? '',
+    sku: sku ?? null,
   });
   return data.product;
 }

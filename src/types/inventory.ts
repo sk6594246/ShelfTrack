@@ -21,6 +21,8 @@ export interface Product {
   imageUrl?: string;
   createdAt: string;
   updatedAt: string;
+  /** Original backend id when client remapped duplicates to SKU */
+  sourceId?: string;
 }
 
 export interface StockMovement {
