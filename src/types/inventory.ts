@@ -166,7 +166,16 @@ export interface DocumentLine {
   fromLocationId?: string;
   toLocationId?: string;
   notes?: string;
+  /** ISO date YYYY-MM-DD */
+  purchaseDate?: string;
+  /** ISO date YYYY-MM-DD */
+  mfgDate?: string;
+  /** ISO date YYYY-MM-DD */
+  expiryDate?: string;
 }
+
+/** Sentinel for transfer from no location (unlocated stock) */
+export const UNLOCATED_LOCATION_ID = '__unlocated__';
 
 export interface StockBatch {
   id: string;
@@ -177,4 +186,10 @@ export interface StockBatch {
   receivedAt: string;
   documentId?: string;
   documentLineId?: string;
+  /** ISO date YYYY-MM-DD */
+  purchaseDate?: string;
+  /** ISO date YYYY-MM-DD */
+  mfgDate?: string;
+  /** ISO date YYYY-MM-DD */
+  expiryDate?: string;
 }
