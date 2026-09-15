@@ -156,3 +156,99 @@ export function issueFromLocation(
 
   saveLocal(BATCHES_KEY, list);
 }
+
+export type ExpiringBatchRow = {
+  batchId: string;
+  productId: string;
+  locationId: string;
+  remaining: number;
+  expiryDate: string;
+  daysLeft: number;
+};
+
+/** Batches with expiry within `withinDays` (default 30). Sorted soonest first. */
+export function getExpiringBatches(withinDays = 30): ExpiringBatchRow[] {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const rows: ExpiringBatchRow[] = [];
+  for (const b of getBatches()) {
+    if (b.remaining <= 0 || !b.expiryDate) continue;
+    const exp = new Date(
+      b.expiryDate + (b.expiryDate.length === 10 ? 'T00:00:00' : '')
+    );
+    if (Number.isNaN(exp.getTime())) continue;
+    const daysLeft = Math.ceil((exp.getTime() - now.getTime()) / 86400000);
+    if (daysLeft > withinDays) continue;
+    rows.push({
+      batchId: b.id,
+      productId: b.productId,
+      locationId: b.locationId,
+      remaining: b.remaining,
+      expiryDate: b.expiryDate,
+      daysLeft,
+    });
+  }
+  rows.sort(
+    (a, b) => a.daysLeft - b.daysLeft || a.expiryDate.localeCompare(b.expiryDate)
+  );
+  return rows;
+}
+
+/** FEFO locations: prefer earliest expiry, then FIFO receivedAt */
+export function getFefoLocationsForProduct(
+  productId: string
+): {
+  location: Location;
+  available: number;
+  earliestExpiry: string | null;
+  oldestAt: string;
+}[] {
+  const batches = getBatchesForProduct(productId);
+  const byLoc = new Map<
+    string,
+    { available: number; oldestAt: string; earliestExpiry: string | null }
+  >();
+
+  for (const b of batches) {
+    const cur = byLoc.get(b.locationId);
+    if (!cur) {
+      byLoc.set(b.locationId, {
+        available: b.remaining,
+        oldestAt: b.receivedAt,
+        earliestExpiry: b.expiryDate || null,
+      });
+    } else {
+      cur.available += b.remaining;
+      if (b.receivedAt < cur.oldestAt) cur.oldestAt = b.receivedAt;
+      if (
+        b.expiryDate &&
+        (!cur.earliestExpiry || b.expiryDate < cur.earliestExpiry)
+      ) {
+        cur.earliestExpiry = b.expiryDate;
+      }
+    }
+  }
+
+  const rows: {
+    location: Location;
+    available: number;
+    earliestExpiry: string | null;
+    oldestAt: string;
+  }[] = [];
+  for (const [locationId, data] of byLoc) {
+    const loc = getLocationById(locationId);
+    if (!loc) continue;
+    rows.push({ location: loc, ...data });
+  }
+
+  rows.sort((a, b) => {
+    if (a.earliestExpiry && b.earliestExpiry) {
+      const c = a.earliestExpiry.localeCompare(b.earliestExpiry);
+      if (c !== 0) return c;
+    } else if (a.earliestExpiry) return -1;
+    else if (b.earliestExpiry) return 1;
+    return a.oldestAt.localeCompare(b.oldestAt);
+  });
+  return rows;
+}
