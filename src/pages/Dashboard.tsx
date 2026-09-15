@@ -4,15 +4,17 @@ import {
   AlertTriangle,
   ArrowRight,
   Boxes,
+  CalendarClock,
   MapPin,
   Package,
   QrCode,
   TrendingDown,
+  Truck,
 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/product/ProductCard';
-import { getLocations, getProductsForLocation } from '../store/mastersStore';
-import { getAvailableQtyAtLocation } from '../store/stockBatchStore';
+import { getLocations, getProductsForLocation, getLocationById } from '../store/mastersStore';
+import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
 import type { Product } from '../types/inventory';
 
 const LOC_KEY = 'st_dash_location';
@@ -65,9 +67,7 @@ function MetricCard({
           {label}
         </span>
       </div>
-      <p className={`st-num mt-3 text-3xl font-bold tracking-tight ${tones.value}`}>
-        {value}
-      </p>
+      <p className={`st-num mt-3 text-3xl font-bold tracking-tight ${tones.value}`}>{value}</p>
     </div>
   );
 }
@@ -84,63 +84,67 @@ function SkeletonDashboard() {
           <div key={i} className="st-skeleton h-24 rounded-2xl" />
         ))}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[1, 2].map((i) => (
-          <div key={i} className="st-skeleton h-28 rounded-2xl" />
-        ))}
-      </div>
     </div>
   );
 }
 
-type ScopedRow = { product: Product; qty: number };
-
 export function Dashboard() {
   const { products, loading } = useProducts();
-  const locations = useMemo(() => getLocations(), []);
+  const [locations, setLocations] = useState(() => getLocations());
   const [locationId, setLocationId] = useState(() => {
     try {
-      return sessionStorage.getItem(LOC_KEY) || '';
+      return localStorage.getItem(LOC_KEY) || '';
     } catch {
       return '';
     }
   });
 
   useEffect(() => {
+    setLocations(getLocations());
+  }, [products]);
+
+  useEffect(() => {
     try {
-      if (locationId) sessionStorage.setItem(LOC_KEY, locationId);
-      else sessionStorage.removeItem(LOC_KEY);
+      if (locationId) localStorage.setItem(LOC_KEY, locationId);
+      else localStorage.removeItem(LOC_KEY);
     } catch {
       /* ignore */
     }
   }, [locationId]);
 
-  const scoped: ScopedRow[] = useMemo(() => {
+  const scoped = useMemo(() => {
     if (!locationId) {
-      return products.map((p) => ({
+      return products.map((p) => ({ product: p, qty: p.quantity }));
+    }
+    return products
+      .map((p) => ({
         product: p,
-        qty: Math.max(0, p.quantity),
-      }));
-    }
-
-    const assigned = new Set(getProductsForLocation(locationId));
-    const rows: ScopedRow[] = [];
-    for (const p of products) {
-      const batchQty = getAvailableQtyAtLocation(p.id, locationId);
-      const isAssigned = assigned.has(p.id);
-      if (!isAssigned && batchQty <= 0) continue;
-      rows.push({ product: p, qty: batchQty });
-    }
-    return rows;
+        qty: getAvailableQtyAtLocation(p.id, locationId),
+      }))
+      .filter((r) => {
+        const assigned = getProductsForLocation(locationId);
+        return assigned.includes(r.product.id) || r.qty > 0;
+      });
   }, [products, locationId]);
 
   const total = scoped.length;
-  const totalUnits = scoped.reduce((sum, r) => sum + r.qty, 0);
+  const totalUnits = scoped.reduce((s, r) => s + r.qty, 0);
   const lowStock = scoped.filter(
     (r) => r.qty > 0 && r.qty <= r.product.reorderPoint
   );
   const outOfStock = scoped.filter((r) => r.qty <= 0);
   const attention = [...outOfStock, ...lowStock];
+
+  const expiring = useMemo(() => {
+    return getExpiringBatches(30)
+      .map((r) => ({
+        ...r,
+        product: products.find((p) => p.id === r.productId),
+        location: getLocationById(r.locationId),
+      }))
+      .filter((r) => !locationId || r.locationId === locationId)
+      .slice(0, 8);
+  }, [products, locationId]);
 
   const selectedLoc = locations.find((l) => l.id === locationId);
   const scopeLabel = selectedLoc
@@ -158,9 +162,7 @@ export function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-[1.75rem]">
             Dashboard
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500">
-            Live overview · {scopeLabel}
-          </p>
+          <p className="mt-0.5 text-sm text-slate-500">Live overview · {scopeLabel}</p>
         </div>
         <Link
           to="/scan"
@@ -193,12 +195,91 @@ export function Dashboard() {
           <button
             type="button"
             onClick={() => setLocationId('')}
-            className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100"
           >
             Clear
           </button>
         )}
       </div>
+
+      <div className="mb-5 grid gap-2 sm:grid-cols-3">
+        <Link
+          to="/receive"
+          className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm transition hover:border-emerald-300"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+            <Truck className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Receiving dock</p>
+            <p className="text-[11px] text-slate-500">GR + put-away in one step</p>
+          </div>
+        </Link>
+        <Link
+          to="/stock"
+          className="flex items-center gap-3 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-3 shadow-sm transition hover:border-indigo-300"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+            <MapPin className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Stock map</p>
+            <p className="text-[11px] text-slate-500">Floor grid & heat view</p>
+          </div>
+        </Link>
+        <Link
+          to="/documents"
+          className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-slate-300"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+            <Package className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Documents</p>
+            <p className="text-[11px] text-slate-500">Pick path from sale/transfer</p>
+          </div>
+        </Link>
+      </div>
+
+      {expiring.length > 0 && (
+        <section className="mb-6 overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 via-white to-white shadow-sm">
+          <div className="flex items-center gap-2 border-b border-amber-100 px-4 py-3">
+            <CalendarClock className="h-4 w-4 text-amber-600" />
+            <h2 className="text-sm font-semibold text-amber-900">Expiry board</h2>
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+              {expiring.length} within 30d
+            </span>
+          </div>
+          <ul className="divide-y divide-amber-50">
+            {expiring.map((r) => (
+              <li key={r.batchId} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900">{r.product?.name || 'Product'}</p>
+                  <p className="truncate text-[11px] text-slate-400">
+                    {r.location?.name || '—'}
+                    {r.location?.code ? ` (${r.location.code})` : ''} · qty {r.remaining}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold tabular-nums ${
+                    r.daysLeft < 0
+                      ? 'bg-rose-100 text-rose-800'
+                      : r.daysLeft <= 7
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {r.daysLeft < 0
+                    ? `Expired ${-r.daysLeft}d`
+                    : r.daysLeft === 0
+                      ? 'Today'
+                      : `${r.daysLeft}d left`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <MetricCard label="Products" value={total} icon={Package} tone="neutral" />
@@ -208,33 +289,21 @@ export function Dashboard() {
           icon={Boxes}
           tone="success"
         />
-        <MetricCard
-          label="Low stock"
-          value={lowStock.length}
-          icon={TrendingDown}
-          tone="warning"
-        />
-        <MetricCard
-          label="Out of stock"
-          value={outOfStock.length}
-          icon={AlertTriangle}
-          tone="danger"
-        />
+        <MetricCard label="Low stock" value={lowStock.length} icon={TrendingDown} tone="warning" />
+        <MetricCard label="Out of stock" value={outOfStock.length} icon={AlertTriangle} tone="danger" />
       </div>
 
       {attention.length > 0 && (
         <section className="mb-8">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">
-              Needs attention
-            </h2>
-            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200/80">
-              {attention.length}
-            </span>
+            <h2 className="text-sm font-semibold text-slate-800">Needs attention</h2>
+            <Link to="/inventory" className="text-xs font-semibold text-indigo-600 hover:underline">
+              Inventory <ArrowRight className="inline h-3 w-3" />
+            </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {attention.slice(0, 4).map(({ product }) => (
-              <ProductCard key={product.id} product={product} compact />
+            {attention.slice(0, 6).map(({ product, qty }) => (
+              <ProductCard key={product.id} product={{ ...product, quantity: qty }} />
             ))}
           </div>
         </section>
@@ -242,64 +311,20 @@ export function Dashboard() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">
-            {locationId ? 'Products at location' : 'Recent products'}
-          </h2>
-          <Link
-            to="/inventory"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-          >
+          <h2 className="text-sm font-semibold text-slate-800">Recent products</h2>
+          <Link to="/inventory" className="text-xs font-semibold text-indigo-600 hover:underline">
             View all
-            <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-
-        {scoped.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
-              <Package className="h-7 w-7" />
-            </div>
-            <p className="mt-4 text-base font-semibold text-slate-800">
-              {locationId ? 'Nothing at this location' : 'No products yet'}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {locationId
-                ? 'Assign products in Masters or post a purchase into this location'
-                : 'Add your first item or scan a QR to get started'}
-            </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              {!locationId && (
-                <Link
-                  to="/products/new"
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-                >
-                  Add product
-                </Link>
-              )}
-              <Link
-                to={locationId ? '/masters' : '/scan'}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                {locationId ? (
-                  <>
-                    <MapPin className="h-4 w-4" />
-                    Open Masters
-                  </>
-                ) : (
-                  <>
-                    <QrCode className="h-4 w-4" />
-                    Scan QR
-                  </>
-                )}
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {scoped.slice(0, 6).map(({ product }) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {products.slice(0, 6).map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
+        </div>
+        {products.length === 0 && (
+          <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-400">
+            No products yet. Add one from Inventory.
+          </p>
         )}
       </section>
     </div>
