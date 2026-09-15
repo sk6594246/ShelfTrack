@@ -78,3 +78,45 @@ body {
 .st-safe-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
+
+/* Micro-interactions */
+@keyframes st-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.st-enter {
+  animation: st-enter 0.22s ease-out both;
+}
+
+@keyframes st-scan-line {
+  0% { transform: translateY(-40%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(40%); opacity: 0; }
+}
+.st-scan-line {
+  animation: st-scan-line 2.2s ease-in-out infinite;
+}
+
+button:active:not(:disabled),
+.st-press:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-enter,
+  .st-scan-line,
+  .st-skeleton {
+    animation: none !important;
+  }
+  button:active:not(:disabled),
+  .st-press:active {
+    transform: none;
+  }
+}
