@@ -93,7 +93,7 @@ export function LocationsPanel() {
     });
     setLayoutRows(next.rows);
     setLayoutCols(next.cols);
-    toast(`Layout set to ${next.rows}×${next.cols}`, 'success');
+    toast(`Layout set to ${next.rows}x${next.cols}`, 'success');
   }
 
   function handleSave(e: React.FormEvent) {
@@ -309,53 +309,60 @@ export function LocationsPanel() {
                   />
                 </label>
 
-                <div className="grid grid-cols-3 gap-2">
-                  <label className="block">
-                    <span className="text-xs font-semibold text-slate-500">
-                      Grid row
-                    </span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={gridRow}
-                      onChange={(e) => setGridRow(e.target.value)}
-                      placeholder="1"
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-semibold text-slate-500">
-                      Grid col
-                    </span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={gridCol}
-                      onChange={(e) => setGridCol(e.target.value)}
-                      placeholder="1"
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs font-semibold text-slate-500">
-                      Shelf #
-                    </span>
-                    <input
-                      type="number"\tableofcontents min={1}
-                      max={20}
-                      value={shelf}
-                      onChange={(e) => setShelf(e.target.value)}
-                      placeholder="1"
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                    />
-                  </label>
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
+                  <p className="mb-2 text-xs font-semibold text-indigo-800">
+                    Map position (for Stock grid)
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-slate-500">
+                        Grid row
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={gridRow}
+                        onChange={(e) => setGridRow(e.target.value)}
+                        placeholder="1"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-slate-500">
+                        Grid col
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={gridCol}
+                        onChange={(e) => setGridCol(e.target.value)}
+                        placeholder="1"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-semibold text-slate-500">
+                        Shelf #
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={shelf}
+                        onChange={(e) => setShelf(e.target.value)}
+                        placeholder="1"
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </label>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Example: row 1, col 1, shelf 2 = 2nd shelf in cell R1C1. Same
+                    cell can have shelf 1 and shelf 2 as separate locations.
+                    Leave row/col empty to keep off the map.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  Same cell (row+col) can hold multiple shelves (1st, 2nd…). Leave
-                  row/col empty to keep location off the map.
-                </p>
 
                 <label className="block">
                   <span className="text-xs font-semibold text-slate-500">Notes</span>
