@@ -4,7 +4,7 @@ import type {
   DocumentLine,
   DocumentType,
 } from '../types/inventory';
-import { adjustStock, getProductById } from './inventoryStore';
+import { adjustStock, resolveProduct } from './inventoryStore';
 import {
   receiveBatch,
   issueFromLocation,
@@ -14,7 +14,6 @@ import {
 const DOCS_KEY = 'inventory_documents';
 const LINES_KEY = 'inventory_document_lines';
 
-/** In-memory lock to prevent double-click double post */
 const postingIds = new Set<string>();
 
 function loadLocal<T>(key: string, fallback: T): T {
@@ -178,8 +177,12 @@ async function applyPostEffects(
   direction: 1 | -1
 ) {
   for (const line of lines) {
-    const product = await getProductById(line.productId);
-    if (!product) throw new Error('Product missing for line');
+    const product = await resolveProduct(line.productId);
+    if (!product) {
+      throw new Error(
+        `Product not found for line (id: ${line.productId}). Re-add the line after refreshing products.`
+      );
+    }
 
     if (doc.type === 'purchase') {
       const change = direction * line.quantity;
@@ -188,17 +191,17 @@ async function applyPostEffects(
           ? `Purchase ${doc.id.slice(0, 8)}`
           : `Reverse purchase ${doc.id.slice(0, 8)}`;
       if (direction === 1) {
-        await adjustStock(line.productId, change, reason);
+        await adjustStock(product.id, change, reason);
         receiveBatch({
-          productId: line.productId,
+          productId: product.id,
           locationId: line.locationId!,
           quantity: line.quantity,
           documentId: doc.id,
           documentLineId: line.id,
         });
       } else {
-        issueFromLocation(line.productId, line.locationId!, line.quantity);
-        await adjustStock(line.productId, change, reason);
+        issueFromLocation(product.id, line.locationId!, line.quantity);
+        await adjustStock(product.id, change, reason);
       }
     } else if (doc.type === 'sale') {
       const change = direction * -line.quantity;
@@ -207,12 +210,12 @@ async function applyPostEffects(
           ? `Sale ${doc.id.slice(0, 8)}`
           : `Reverse sale ${doc.id.slice(0, 8)}`;
       if (direction === 1) {
-        issueFromLocation(line.productId, line.locationId!, line.quantity);
-        await adjustStock(line.productId, change, reason);
+        issueFromLocation(product.id, line.locationId!, line.quantity);
+        await adjustStock(product.id, change, reason);
       } else {
-        await adjustStock(line.productId, change, reason);
+        await adjustStock(product.id, change, reason);
         receiveBatch({
-          productId: line.productId,
+          productId: product.id,
           locationId: line.locationId!,
           quantity: line.quantity,
           documentId: doc.id,
@@ -221,18 +224,18 @@ async function applyPostEffects(
       }
     } else if (doc.type === 'transfer') {
       if (direction === 1) {
-        issueFromLocation(line.productId, line.fromLocationId!, line.quantity);
+        issueFromLocation(product.id, line.fromLocationId!, line.quantity);
         receiveBatch({
-          productId: line.productId,
+          productId: product.id,
           locationId: line.toLocationId!,
           quantity: line.quantity,
           documentId: doc.id,
           documentLineId: line.id,
         });
       } else {
-        issueFromLocation(line.productId, line.toLocationId!, line.quantity);
+        issueFromLocation(product.id, line.toLocationId!, line.quantity);
         receiveBatch({
-          productId: line.productId,
+          productId: product.id,
           locationId: line.fromLocationId!,
           quantity: line.quantity,
           documentId: doc.id,
@@ -249,17 +252,16 @@ async function validateStockForPost(
 ) {
   if (doc.type === 'sale') {
     for (const line of lines) {
-      const product = await getProductById(line.productId);
-      if (!product) throw new Error('Product missing for line');
+      const product = await resolveProduct(line.productId);
+      if (!product) {
+        throw new Error(`Product not found for line (id: ${line.productId})`);
+      }
       if (product.quantity < line.quantity) {
         throw new Error(
           `Insufficient stock for ${product.name}: have ${product.quantity}, need ${line.quantity}`
         );
       }
-      const atLoc = getAvailableQtyAtLocation(
-        line.productId,
-        line.locationId!
-      );
+      const atLoc = getAvailableQtyAtLocation(product.id, line.locationId!);
       if (atLoc < line.quantity) {
         throw new Error(
           `Insufficient stock at location for ${product.name}: have ${atLoc}, need ${line.quantity}`
@@ -270,12 +272,10 @@ async function validateStockForPost(
 
   if (doc.type === 'transfer') {
     for (const line of lines) {
-      const atLoc = getAvailableQtyAtLocation(
-        line.productId,
-        line.fromLocationId!
-      );
+      const product = await resolveProduct(line.productId);
+      const pid = product?.id || line.productId;
+      const atLoc = getAvailableQtyAtLocation(pid, line.fromLocationId!);
       if (atLoc < line.quantity) {
-        const product = await getProductById(line.productId);
         throw new Error(
           `Insufficient stock at source for ${product?.name || 'product'}: have ${atLoc}, need ${line.quantity}`
         );
@@ -340,12 +340,10 @@ export async function reverseDocument(id: string): Promise<InventoryDocument> {
 
   if (doc.type === 'purchase') {
     for (const line of lines) {
-      const atLoc = getAvailableQtyAtLocation(
-        line.productId,
-        line.locationId!
-      );
+      const product = await resolveProduct(line.productId);
+      const pid = product?.id || line.productId;
+      const atLoc = getAvailableQtyAtLocation(pid, line.locationId!);
       if (atLoc < line.quantity) {
-        const product = await getProductById(line.productId);
         throw new Error(
           `Cannot reverse: not enough stock at location for ${product?.name || 'product'} (have ${atLoc}, need ${line.quantity}). Stock may have been sold or transferred.`
         );
@@ -355,12 +353,10 @@ export async function reverseDocument(id: string): Promise<InventoryDocument> {
 
   if (doc.type === 'transfer') {
     for (const line of lines) {
-      const atLoc = getAvailableQtyAtLocation(
-        line.productId,
-        line.toLocationId!
-      );
+      const product = await resolveProduct(line.productId);
+      const pid = product?.id || line.productId;
+      const atLoc = getAvailableQtyAtLocation(pid, line.toLocationId!);
       if (atLoc < line.quantity) {
-        const product = await getProductById(line.productId);
         throw new Error(
           `Cannot reverse transfer: not enough stock at destination for ${product?.name || 'product'} (have ${atLoc}, need ${line.quantity})`
         );
