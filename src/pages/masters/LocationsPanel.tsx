@@ -8,6 +8,7 @@ import {
   getProductsForLocation,
   setProductsForLocation,
 } from '../../store/mastersStore';
+import { getStoreLayout, saveStoreLayout } from '../../store/layoutStore';
 import { getProducts } from '../../store/inventoryStore';
 import { QRPrintModal } from '../../components/qr/QRPrintModal';
 import { buildLocationQRPayload, payloadToJson } from '../../lib/qrPayload';
@@ -21,14 +22,22 @@ export function LocationsPanel() {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [notes, setNotes] = useState('');
+  const [gridRow, setGridRow] = useState('');
+  const [gridCol, setGridCol] = useState('');
+  const [shelf, setShelf] = useState('1');
   const [assignedIds, setAssignedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [printLoc, setPrintLoc] = useState<Location | null>(null);
   const [query, setQuery] = useState('');
+  const [layoutRows, setLayoutRows] = useState(() => getStoreLayout().rows);
+  const [layoutCols, setLayoutCols] = useState(() => getStoreLayout().cols);
 
   const reload = useCallback(() => {
     setList(getLocations());
     getProducts().then(setProducts);
+    const layout = getStoreLayout();
+    setLayoutRows(layout.rows);
+    setLayoutCols(layout.cols);
   }, []);
 
   useEffect(() => {
@@ -51,6 +60,9 @@ export function LocationsPanel() {
     setName('');
     setCode('');
     setNotes('');
+    setGridRow('');
+    setGridCol('');
+    setShelf('1');
     setAssignedIds([]);
     setError(null);
   }
@@ -61,6 +73,9 @@ export function LocationsPanel() {
     setName(loc.name);
     setCode(loc.code || '');
     setNotes(loc.notes || '');
+    setGridRow(loc.gridRow != null ? String(loc.gridRow) : '');
+    setGridCol(loc.gridCol != null ? String(loc.gridCol) : '');
+    setShelf(loc.shelf != null ? String(loc.shelf) : '1');
     setAssignedIds(getProductsForLocation(loc.id));
     setError(null);
   }
@@ -69,6 +84,16 @@ export function LocationsPanel() {
     setCreating(false);
     setEditing(null);
     setError(null);
+  }
+
+  function handleSaveLayout() {
+    const next = saveStoreLayout({
+      rows: Number(layoutRows) || 5,
+      cols: Number(layoutCols) || 8,
+    });
+    setLayoutRows(next.rows);
+    setLayoutCols(next.cols);
+    toast(`Layout set to ${next.rows}×${next.cols}`, 'success');
   }
 
   function handleSave(e: React.FormEvent) {
@@ -83,6 +108,9 @@ export function LocationsPanel() {
         name,
         code: code || undefined,
         notes: notes || undefined,
+        gridRow: gridRow ? Number(gridRow) : undefined,
+        gridCol: gridCol ? Number(gridCol) : undefined,
+        shelf: shelf ? Number(shelf) : undefined,
       });
       setProductsForLocation(saved.id, assignedIds);
       toast(editing ? 'Location updated' : 'Location created', 'success');
@@ -114,210 +142,308 @@ export function LocationsPanel() {
   const formOpen = creating || !!editing;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-5">
-      <div className="space-y-3 lg:col-span-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-700">
-            Locations{' '}
-            <span className="font-normal text-slate-400">({list.length})</span>
-          </h2>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add
-          </button>
-        </div>
-
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search locations…"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          />
-        </div>
-
-        {filtered.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-400">
-            {list.length === 0 ? 'No locations yet' : 'No matches'}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Store layout grid
           </p>
-        ) : (
-          <ul className="space-y-2">
-            {filtered.map((loc) => {
-              const count = getProductsForLocation(loc.id).length;
-              return (
-                <li key={loc.id}>
-                  <div
-                    className={`flex items-center gap-2 rounded-xl border px-2 py-2 transition ${
-                      editing?.id === loc.id
-                        ? 'border-indigo-300 bg-indigo-50 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openEdit(loc)}
-                      className="flex min-w-0 flex-1 items-center gap-3 px-1 py-1 text-left"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                        <MapPin className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900">
-                          {loc.name}
-                        </p>
-                        <p className="truncate text-[11px] text-slate-400">
-                          {loc.code ? `${loc.code} · ` : ''}
-                          {count} product{count !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPrintLoc(loc)}
-                      className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
-                      title="Print QR"
-                    >
-                      <Printer className="h-4 w-4" />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+          <p className="mt-0.5 text-xs text-slate-400">
+            Excel-style map size used on Stock page
+          </p>
+        </div>
+        <label className="text-xs font-medium text-slate-600">
+          Rows
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={layoutRows}
+            onChange={(e) => setLayoutRows(Number(e.target.value) || 1)}
+            className="mt-1 block w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+          />
+        </label>
+        <label className="text-xs font-medium text-slate-600">
+          Cols
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={layoutCols}
+            onChange={(e) => setLayoutCols(Number(e.target.value) || 1)}
+            className="mt-1 block w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handleSaveLayout}
+          className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+        >
+          Save layout
+        </button>
       </div>
 
-      <div className="lg:col-span-3">
-        {formOpen ? (
-          <form
-            onSubmit={handleSave}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm st-enter"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">
-                {editing ? 'Edit location' : 'New location'}
-              </h3>
-              <button
-                type="button"
-                onClick={closeForm}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            {error ? (
-              <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                {error}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="space-y-3 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Locations{' '}
+              <span className="font-normal text-slate-400">({list.length})</span>
+            </h2>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
+          </div>
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search locations…"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-400">
+              {list.length === 0 ? 'No locations yet' : 'No matches'}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {filtered.map((loc) => {
+                const count = getProductsForLocation(loc.id).length;
+                const cell =
+                  loc.gridRow != null && loc.gridCol != null
+                    ? `R${loc.gridRow}C${loc.gridCol}`
+                    : 'off-grid';
+                return (
+                  <li key={loc.id}>
+                    <div
+                      className={`flex items-center gap-2 rounded-xl border px-2 py-2 transition ${
+                        editing?.id === loc.id
+                          ? 'border-indigo-300 bg-indigo-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openEdit(loc)}
+                        className="flex min-w-0 flex-1 items-center gap-3 px-1 py-1 text-left"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {loc.name}
+                          </p>
+                          <p className="truncate text-[11px] text-slate-400">
+                            {cell}
+                            {loc.shelf ? ` · S${loc.shelf}` : ''}
+                            {loc.code ? ` · ${loc.code}` : ''} · {count} prod
+                          </p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPrintLoc(loc)}
+                        className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
+                        title="Print QR"
+                      >
+                        <Printer className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="lg:col-span-3">
+          {formOpen ? (
+            <form
+              onSubmit={handleSave}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm st-enter"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-slate-900">
+                  {editing ? 'Edit location' : 'New location'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeForm}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            ) : null}
-            <div className="space-y-3">
-              <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Name *</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                  required
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Code</span>
-                <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="e.g. A1"
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Notes</span>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                />
-              </label>
-              <div>
-                <span className="text-xs font-semibold text-slate-500">
-                  Storable products
-                </span>
-                <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
-                  {products.length === 0 ? (
-                    <p className="p-2 text-xs text-slate-400">No products yet</p>
-                  ) : (
-                    products
-                      .filter((p) => !!p.id)
-                      .map((p) => {
-                        const inputId = `loc-assign-${p.id}`;
-                        const isChecked = assignedIds.includes(p.id);
-                        return (
-                          <div
-                            key={`${p.id}::${p.sku || p.name}`}
-                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50"
-                          >
-                            <input
-                              id={inputId}
-                              name={inputId}
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                toggleProduct(p.id, e.target.checked);
-                              }}
-                              className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <label
-                              htmlFor={inputId}
-                              className="min-w-0 flex-1 cursor-pointer truncate"
+              {error ? (
+                <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {error}
+                </div>
+              ) : null}
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500">Name *</span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500">Code</span>
+                  <input
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="e.g. A1"
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </label>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">
+                      Grid row
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={gridRow}
+                      onChange={(e) => setGridRow(e.target.value)}
+                      placeholder="1"
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">
+                      Grid col
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={gridCol}
+                      onChange={(e) => setGridCol(e.target.value)}
+                      placeholder="1"
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-500">
+                      Shelf #
+                    </span>
+                    <input
+                      type="number"\tableofcontents min={1}
+                      max={20}
+                      value={shelf}
+                      onChange={(e) => setShelf(e.target.value)}
+                      placeholder="1"
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </label>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Same cell (row+col) can hold multiple shelves (1st, 2nd…). Leave
+                  row/col empty to keep location off the map.
+                </p>
+
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500">Notes</span>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                </label>
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">
+                    Storable products
+                  </span>
+                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
+                    {products.length === 0 ? (
+                      <p className="p-2 text-xs text-slate-400">No products yet</p>
+                    ) : (
+                      products
+                        .filter((p) => !!p.id)
+                        .map((p) => {
+                          const inputId = `loc-assign-${p.id}`;
+                          const isChecked = assignedIds.includes(p.id);
+                          return (
+                            <div
+                              key={`${p.id}::${p.sku || p.name}`}
+                              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50"
                             >
-                              {p.name}{' '}
-                              <span className="text-xs text-slate-400">({p.sku})</span>
-                            </label>
-                          </div>
-                        );
-                      })
-                  )}
+                              <input
+                                id={inputId}
+                                name={inputId}
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleProduct(p.id, e.target.checked);
+                                }}
+                                className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <label
+                                htmlFor={inputId}
+                                className="min-w-0 flex-1 cursor-pointer truncate"
+                              >
+                                {p.name}{' '}
+                                <span className="text-xs text-slate-400">
+                                  ({p.sku})
+                                </span>
+                              </label>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
                 </div>
               </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  Save
+                </button>
+                {editing && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setPrintLoc(editing)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <Printer className="h-4 w-4" /> Print QR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(editing.id)}
+                      className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </button>
+                  </>
+                )}
+              </div>
+            </form>
+          ) : (
+            <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+              Select a location or add a new one
             </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="submit"
-                className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                Save
-              </button>
-              {editing && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setPrintLoc(editing)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Printer className="h-4 w-4" /> Print QR
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(editing.id)}
-                    className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50"
-                  >
-                    <Trash2 className="h-4 w-4" /> Delete
-                  </button>
-                </>
-              )}
-            </div>
-          </form>
-        ) : (
-          <div className="flex h-full min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            Select a location or add a new one
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {printLoc && (
