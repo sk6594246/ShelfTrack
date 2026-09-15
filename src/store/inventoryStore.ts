@@ -21,15 +21,53 @@ function saveLocal<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+/**
+ * GAS / Sheets sometimes returns multiple products with the same id.
+ * That breaks checkbox assignment (all rows share one identity).
+ * When ids collide or are missing, use a stable unique id from sku (+ index).
+ */
+export function normalizeProductIds(products: Product[]): Product[] {
+  if (!products.length) return products;
+
+  const idCounts = new Map<string, number>();
+  for (const p of products) {
+    const id = p.id || '';
+    idCounts.set(id, (idCounts.get(id) || 0) + 1);
+  }
+
+  const used = new Set<string>();
+  return products.map((p, i) => {
+    const raw = (p.id || '').trim();
+    const duplicate = !raw || (idCounts.get(raw) || 0) > 1;
+    if (!duplicate && !used.has(raw)) {
+      used.add(raw);
+      return p;
+    }
+
+    const sku = (p.sku || '').trim();
+    let next = sku || `product-${i}`;
+    if (used.has(next)) {
+      next = `${next}-${i}`;
+    }
+    used.add(next);
+    return { ...p, id: next };
+  });
+}
+
 // ---------- Products ----------
 export async function getProducts(): Promise<Product[]> {
   if (isGasEnabled()) {
-    return gas.gasGetProducts();
+    const list = await gas.gasGetProducts();
+    return normalizeProductIds(list as Product[]);
   }
-  return loadLocal<Product[]>(PRODUCTS_KEY, []);
+  return normalizeProductIds(loadLocal<Product[]>(PRODUCTS_KEY, []));
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {
+  const all = await getProducts();
+  const found = all.find((p) => p.id === id);
+  if (found) return found;
+
   if (isGasEnabled()) {
     const p = await gas.gasGetProduct(id);
     return p ?? undefined;
@@ -98,7 +136,6 @@ export async function deleteProduct(id: string): Promise<void> {
   saveLocal(MOVEMENTS_KEY, movements);
 }
 
-// ---------- Stock movements ----------
 export async function getMovements(productId?: string): Promise<StockMovement[]> {
   if (isGasEnabled()) {
     return gas.gasGetMovements(productId);
@@ -141,7 +178,6 @@ export async function adjustStock(
   return updated;
 }
 
-// ---------- QR Mapping Config ----------
 export async function getQRMapping(): Promise<QRMappingConfig> {
   if (isGasEnabled()) {
     const config = await gas.gasGetQRMapping();
@@ -158,9 +194,8 @@ export async function saveQRMapping(config: QRMappingConfig): Promise<void> {
   saveLocal(QR_CONFIG_KEY, config);
 }
 
-// ---------- Seed data (local only) ----------
 export async function seedDemoData(): Promise<void> {
-  if (isGasEnabled()) return; // never seed when using GAS
+  if (isGasEnabled()) return;
 
   const existing = await getProducts();
   if (existing.length > 0) return;
