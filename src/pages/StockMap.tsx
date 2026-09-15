@@ -51,6 +51,7 @@ export function StockMap() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [productId, setProductId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [heatMode, setHeatMode] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -98,20 +99,12 @@ export function StockMap() {
         earliestExpiry = exp[0] || null;
       }
       const list = map.get(key) || [];
-      list.push({
-        location: loc,
-        qty,
-        firstGr,
-        earliestExpiry,
-        assigned,
-      });
+      list.push({ location: loc, qty, firstGr, earliestExpiry, assigned });
       map.set(key, list);
     }
 
     for (const [, list] of map) {
-      list.sort(
-        (a, b) => (a.location.shelf || 1) - (b.location.shelf || 1)
-      );
+      list.sort((a, b) => (a.location.shelf || 1) - (b.location.shelf || 1));
     }
     return map;
   }, [productId, locations, layout.rows, layout.cols]);
@@ -123,6 +116,20 @@ export function StockMap() {
     }
     return m || 1;
   }, [cellData]);
+
+  const cellTotals = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const [key, list] of cellData) {
+      m.set(key, list.reduce((s, x) => s + x.qty, 0));
+    }
+    return m;
+  }, [cellData]);
+
+  const maxCellTotal = useMemo(() => {
+    let m = 0;
+    for (const v of cellTotals.values()) m = Math.max(m, v);
+    return m || 1;
+  }, [cellTotals]);
 
   const unmapped = useMemo(() => {
     if (!productId) return [];
@@ -141,9 +148,7 @@ export function StockMap() {
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
       <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Stock map
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Stock map</h1>
           <p className="mt-0.5 text-sm text-slate-500">
             Find where a product sits on your store grid
           </p>
@@ -174,6 +179,17 @@ export function StockMap() {
         <span className="text-xs text-slate-400">
           Grid {layout.rows}×{layout.cols}
         </span>
+        <button
+          type="button"
+          onClick={() => setHeatMode((v) => !v)}
+          className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+            heatMode
+              ? 'bg-orange-100 text-orange-800 ring-1 ring-orange-200'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          {heatMode ? 'Heat on' : 'Heat map'}
+        </button>
       </div>
 
       {loading ? (
@@ -183,20 +199,16 @@ export function StockMap() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
             <Grid3x3 className="h-7 w-7" />
           </div>
-          <p className="mt-4 text-base font-semibold text-slate-800">
-            Pick a product to open the map
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            Assign locations to grid cells in Masters → Locations
-          </p>
+          <p className="mt-4 text-base font-semibold text-slate-800">Pick a product to open the map</p>
+          <p className="mt-1 text-sm text-slate-500">Assign locations to grid cells in Masters → Locations</p>
         </div>
       ) : (
         <>
           {selected && (
             <p className="mb-3 text-sm text-slate-600">
-              Showing{' '}
-              <span className="font-semibold text-slate-900">{selected.name}</span>{' '}
+              Showing <span className="font-semibold text-slate-900">{selected.name}</span>{' '}
               <span className="text-slate-400">({selected.sku})</span>
+              {heatMode && <span className="ml-2 text-orange-600">· heat density</span>}
             </p>
           )}
 
@@ -216,27 +228,40 @@ export function StockMap() {
                   const hasAny = shelves.length > 0;
                   const hasStock = shelves.some((s) => s.qty > 0);
                   const hasAssigned = shelves.some((s) => s.assigned);
+                  const cellTotal = cellTotals.get(key) || 0;
+                  const heatPct = heatMode
+                    ? Math.round((cellTotal / maxCellTotal) * 100)
+                    : 0;
 
                   return (
                     <div
                       key={key}
                       className={`flex min-h-[5.5rem] flex-col rounded-lg border p-1.5 ${
-                        hasStock
-                          ? 'border-indigo-300 bg-indigo-50/80'
-                          : hasAssigned
-                            ? 'border-slate-200 bg-white'
-                            : hasAny
-                              ? 'border-slate-100 bg-slate-50/80'
-                              : 'border-dashed border-slate-200 bg-slate-50/40 opacity-50'
+                        heatMode
+                          ? cellTotal > 0
+                            ? 'border-orange-200'
+                            : 'border-dashed border-slate-200 bg-slate-50/40 opacity-40'
+                          : hasStock
+                            ? 'border-indigo-300 bg-indigo-50/80'
+                            : hasAssigned
+                              ? 'border-slate-200 bg-white'
+                              : hasAny
+                                ? 'border-slate-100 bg-slate-50/80'
+                                : 'border-dashed border-slate-200 bg-slate-50/40 opacity-50'
                       }`}
+                      style={
+                        heatMode && cellTotal > 0
+                          ? {
+                              background: `rgba(249, 115, 22, ${0.08 + (heatPct / 100) * 0.45})`,
+                            }
+                          : undefined
+                      }
                     >
                       <div className="mb-1 flex items-center justify-between gap-1">
                         <span className="font-mono text-[9px] font-semibold text-slate-400">
                           R{row}C{col}
                         </span>
-                        {hasStock && (
-                          <MapPin className="h-3 w-3 text-indigo-500" />
-                        )}
+                        {hasStock && <MapPin className="h-3 w-3 text-indigo-500" />}
                       </div>
 
                       {shelves.length === 0 ? (
@@ -246,25 +271,18 @@ export function StockMap() {
                       ) : (
                         <div className="flex flex-1 flex-col justify-end gap-1">
                           {shelves.map((s) => {
-                            const fill = Math.min(
-                              100,
-                              Math.round((s.qty / maxQty) * 100)
-                            );
+                            const fill = Math.min(100, Math.round((s.qty / maxQty) * 100));
                             const muted = !s.assigned && s.qty <= 0;
                             return (
                               <div
                                 key={s.location.id}
-                                className={`rounded-md px-1 py-0.5 ${
-                                  muted ? 'opacity-40' : ''
-                                }`}
+                                className={`rounded-md px-1 py-0.5 ${muted ? 'opacity-40' : ''}`}
                                 title={`${s.location.name}${s.location.shelf ? ` · shelf ${s.location.shelf}` : ''}`}
                               >
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="truncate text-[10px] font-semibold text-slate-700">
                                     {s.location.code || s.location.name}
-                                    {s.location.shelf
-                                      ? ` · S${s.location.shelf}`
-                                      : ''}
+                                    {s.location.shelf ? ` · S${s.location.shelf}` : ''}
                                   </span>
                                   <span className="st-num shrink-0 text-[10px] font-bold text-slate-900">
                                     {s.qty}
@@ -273,9 +291,7 @@ export function StockMap() {
                                 <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-200/80">
                                   <div
                                     className={`h-full rounded-full transition-all ${
-                                      s.qty > 0
-                                        ? 'bg-indigo-500'
-                                        : 'bg-slate-300'
+                                      s.qty > 0 ? 'bg-indigo-500' : 'bg-slate-300'
                                     }`}
                                     style={{
                                       width: `${s.qty > 0 ? Math.max(fill, 8) : 0}%`,
@@ -310,8 +326,8 @@ export function StockMap() {
               Has stock
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded border border-slate-200 bg-white" />
-              Assigned, empty
+              <span className="h-3 w-3 rounded border border-orange-200 bg-orange-100" />
+              Heat density
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-3 w-3 rounded border border-dashed border-slate-200 bg-slate-50 opacity-50" />
@@ -321,9 +337,7 @@ export function StockMap() {
 
           {unmapped.length > 0 && (
             <section className="mt-6">
-              <h2 className="mb-2 text-sm font-semibold text-slate-800">
-                Locations not on grid
-              </h2>
+              <h2 className="mb-2 text-sm font-semibold text-slate-800">Locations not on grid</h2>
               <ul className="grid gap-2 sm:grid-cols-2">
                 {unmapped.map((loc) => {
                   const qty = getAvailableQtyAtLocation(productId, loc.id);
@@ -336,9 +350,7 @@ export function StockMap() {
                       <span className="font-medium text-slate-800">
                         {loc.name}
                         {loc.code ? (
-                          <span className="ml-1 text-xs text-slate-400">
-                            ({loc.code})
-                          </span>
+                          <span className="ml-1 text-xs text-slate-400">({loc.code})</span>
                         ) : null}
                       </span>
                       <span className="text-xs text-slate-500">
