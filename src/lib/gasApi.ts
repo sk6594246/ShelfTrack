@@ -89,3 +89,50 @@ export async function gasGetQRMapping() {
 export async function gasSaveQRMapping(config: Record<string, unknown>) {
   await gasRequest('saveQRMapping', { config });
 }
+
+// ---------- Locations (mapPosition = "row,col,shelf") ----------
+export type GasLocation = {
+  id: string;
+  name: string;
+  code?: string;
+  notes?: string;
+  gridRow?: number;
+  gridCol?: number;
+  shelf?: number;
+  mapPosition?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function gasGetLocations(): Promise<GasLocation[]> {
+  const data = await gasRequest<{ locations: GasLocation[] }>('getLocations');
+  return data.locations ?? [];
+}
+
+export async function gasSaveLocation(
+  location: Record<string, unknown>
+): Promise<GasLocation> {
+  const data = await gasRequest<{ location: GasLocation }>('saveLocation', {
+    location,
+  });
+  return data.location;
+}
+
+export async function gasDeleteLocation(id: string): Promise<void> {
+  await gasRequest('deleteLocation', { id });
+}
+
+export async function gasGetLocationProducts(locationId?: string) {
+  const data = await gasRequest<{ links: { locationId: string; productId: string }[] }>(
+    'getLocationProducts',
+    { locationId: locationId ?? null }
+  );
+  return data.links ?? [];
+}
+
+export async function gasSetLocationProducts(
+  locationId: string,
+  productIds: string[]
+): Promise<void> {
+  await gasRequest('setLocationProducts', { locationId, productIds });
+}
