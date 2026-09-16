@@ -1,6 +1,23 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { StockBatch, Location } from '../types/inventory';
+import type { StockBatch, Location, Product } from '../types/inventory';
 import { getLocationById, getLocationsForProduct } from './mastersStore';
+
+/** Match batch.productId against normalized product id / sku / sourceId */
+export function productIdAliases(
+  product: Pick<Product, 'id' | 'sku' | 'sourceId'>
+): string[] {
+  const ids = [product.id];
+  if (product.sourceId) ids.push(product.sourceId);
+  if (product.sku?.trim()) ids.push(product.sku.trim());
+  return [...new Set(ids.filter(Boolean))];
+}
+
+export function batchBelongsToProduct(
+  batchProductId: string,
+  product: Pick<Product, 'id' | 'sku' | 'sourceId'>
+): boolean {
+  return productIdAliases(product).includes(batchProductId);
+}
 
 const BATCHES_KEY = 'inventory_stock_batches';
 
@@ -38,6 +55,29 @@ export function getAvailableQtyAtLocation(
         b.locationId === locationId &&
         b.remaining > 0
     )
+    .reduce((sum, b) => sum + b.remaining, 0);
+}
+
+/** Qty at location matching product id, sku, or sourceId */
+export function getAvailableQtyForProductAtLocation(
+  product: Pick<Product, 'id' | 'sku' | 'sourceId'>,
+  locationId: string
+): number {
+  return getBatches()
+    .filter(
+      (b) =>
+        batchBelongsToProduct(b.productId, product) &&
+        b.locationId === locationId &&
+        b.remaining > 0
+    )
+    .reduce((sum, b) => sum + b.remaining, 0);
+}
+
+export function getLocatedQtyForProductEntity(
+  product: Pick<Product, 'id' | 'sku' | 'sourceId' | 'quantity'>
+): number {
+  return getBatches()
+    .filter((b) => batchBelongsToProduct(b.productId, product) && b.remaining > 0)
     .reduce((sum, b) => sum + b.remaining, 0);
 }
 
@@ -166,7 +206,6 @@ export type ExpiringBatchRow = {
   daysLeft: number;
 };
 
-/** Batches with expiry within `withinDays` (default 30). Sorted soonest first. */
 export function getExpiringBatches(withinDays = 30): ExpiringBatchRow[] {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -195,7 +234,6 @@ export function getExpiringBatches(withinDays = 30): ExpiringBatchRow[] {
   return rows;
 }
 
-/** FEFO locations: prefer earliest expiry, then FIFO receivedAt */
 export function getFefoLocationsForProduct(
   productId: string
 ): {
