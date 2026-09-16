@@ -15,7 +15,7 @@ import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/product/ProductCard';
 import { getLocations, getProductsForLocation, getLocationById } from '../store/mastersStore';
 import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
-import type { Product } from '../types/inventory';
+//import type { Product } from '../types/inventory';
 
 const LOC_KEY = 'st_dash_location';
 
