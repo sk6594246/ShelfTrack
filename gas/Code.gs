@@ -10,26 +10,37 @@
  *    - Execute as: Me
  *    - Who has access: Anyone (or Anyone with Google account)
  * 5. Copy the Web App URL into the frontend .env as VITE_GAS_WEB_APP_URL
+ *
+ * Locations mapPosition format: "row,col,shelf" e.g. "1,2,3"
+ *   - row,col required for map cell; shelf optional
+ *   - empty mapPosition = off-grid
  */
 
-const SHEET_PRODUCTS = 'Products';
-const SHEET_MOVEMENTS = 'Movements';
-const SHEET_CONFIG = 'Config';
+var SHEET_PRODUCTS = 'Products';
+var SHEET_MOVEMENTS = 'Movements';
+var SHEET_CONFIG = 'Config';
+var SHEET_LOCATIONS = 'Locations';
+var SHEET_LOCATION_PRODUCTS = 'LocationProducts';
 
-const PRODUCT_HEADERS = [
+var PRODUCT_HEADERS = [
   'id', 'name', 'sku', 'barcode', 'customId', 'category', 'location',
   'quantity', 'reorderPoint', 'notes', 'imageUrl', 'createdAt', 'updatedAt'
 ];
 
-const MOVEMENT_HEADERS = ['id', 'productId', 'change', 'reason', 'createdAt'];
+var MOVEMENT_HEADERS = ['id', 'productId', 'change', 'reason', 'createdAt'];
 
-// ---------- Entry points ----------
+var LOCATION_HEADERS = [
+  'id', 'name', 'code', 'mapPosition', 'notes', 'createdAt', 'updatedAt'
+];
+
+var LOCATION_PRODUCT_HEADERS = ['locationId', 'productId'];
+
 function doPost(e) {
   try {
-    const body = JSON.parse(e.postData.contents);
-    const action = body.action;
+    var body = JSON.parse(e.postData.contents);
+    var action = body.action;
+    var result;
 
-    let result;
     switch (action) {
       case 'getProducts':
         result = { products: getAllProducts_() };
@@ -57,6 +68,23 @@ function doPost(e) {
         saveQRMapping_(body.config);
         result = { ok: true };
         break;
+      case 'getLocations':
+        result = { locations: getAllLocations_() };
+        break;
+      case 'saveLocation':
+        result = { location: saveLocation_(body.location) };
+        break;
+      case 'deleteLocation':
+        deleteLocation_(body.id);
+        result = { ok: true };
+        break;
+      case 'getLocationProducts':
+        result = { links: getLocationProducts_(body.locationId) };
+        break;
+      case 'setLocationProducts':
+        setLocationProducts_(body.locationId, body.productIds || []);
+        result = { ok: true };
+        break;
       default:
         result = { error: 'Unknown action: ' + action };
     }
@@ -67,11 +95,11 @@ function doPost(e) {
   }
 }
 
-// Also allow GET for simple health checks
 function doGet() {
   return jsonResponse_({
     status: 'ok',
     service: 'Inventory Tracker GAS',
+    sheets: [SHEET_PRODUCTS, SHEET_MOVEMENTS, SHEET_CONFIG, SHEET_LOCATIONS, SHEET_LOCATION_PRODUCTS],
     time: new Date().toISOString(),
   });
 }
@@ -82,37 +110,46 @@ function jsonResponse_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ---------- Initialization ----------
 /**
- * Run this once from the Apps Script editor to create the required sheets + headers.
+ * Run once from the Apps Script editor to create/upgrade sheets + headers.
+ * Safe to re-run: adds missing sheets/headers without wiping data.
  */
 function initializeSheets() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   ensureSheet_(ss, SHEET_PRODUCTS, PRODUCT_HEADERS);
   ensureSheet_(ss, SHEET_MOVEMENTS, MOVEMENT_HEADERS);
   ensureSheet_(ss, SHEET_CONFIG, ['key', 'value']);
+  ensureSheet_(ss, SHEET_LOCATIONS, LOCATION_HEADERS);
+  ensureSheet_(ss, SHEET_LOCATION_PRODUCTS, LOCATION_PRODUCT_HEADERS);
+  ensureLocationHeaders_(ss);
 
-  // Default QR mapping
-  const configSheet = ss.getSheetByName(SHEET_CONFIG);
-  const data = configSheet.getDataRange().getValues();
-  const hasMapping = data.some((row) => row[0] === 'qrMapping');
+  var configSheet = ss.getSheetByName(SHEET_CONFIG);
+  var data = configSheet.getDataRange().getValues();
+  var hasMapping = false;
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === 'qrMapping') hasMapping = true;
+  }
   if (!hasMapping) {
     configSheet.appendRow([
       'qrMapping',
       JSON.stringify({
         primaryLookupField: 'sku',
         fillFields: ['sku', 'barcode'],
-        payloadParser: 'plain',
+        payloadParser: 'json',
       }),
     ]);
   }
 
-  SpreadsheetApp.getUi().alert('Sheets initialized successfully.');
+  SpreadsheetApp.getUi().alert(
+    'Sheets initialized successfully.\n\n' +
+    'Tabs: Products, Movements, Config, Locations, LocationProducts\n' +
+    'Locations.mapPosition format: row,col,shelf e.g. 1,2,3'
+  );
 }
 
 function ensureSheet_(ss, name, headers) {
-  let sheet = ss.getSheetByName(name);
+  var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
   }
@@ -123,31 +160,90 @@ function ensureSheet_(ss, name, headers) {
   return sheet;
 }
 
-// ---------- Products ----------
-function getAllProducts_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PRODUCTS);
-  const values = sheet.getDataRange().getValues();
+function ensureLocationHeaders_(ss) {
+  var sheet = ss.getSheetByName(SHEET_LOCATIONS);
+  if (!sheet || sheet.getLastRow() < 1) return;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var headerStr = headers.map(String);
+  for (var i = 0; i < LOCATION_HEADERS.length; i++) {
+    var h = LOCATION_HEADERS[i];
+    if (headerStr.indexOf(h) === -1) {
+      sheet.getRange(1, headers.length + 1).setValue(h).setFontWeight('bold');
+      headers.push(h);
+      headerStr.push(h);
+    }
+  }
+}
+
+function parseMapPosition_(raw) {
+  var out = { gridRow: null, gridCol: null, shelf: null };
+  if (raw === null || raw === undefined || raw === '') return out;
+  var parts = String(raw).split(',');
+  function num(s) {
+    var n = parseInt(String(s).trim(), 10);
+    return isNaN(n) || n < 1 ? null : n;
+  }
+  if (parts.length >= 1) out.gridRow = num(parts[0]);
+  if (parts.length >= 2) out.gridCol = num(parts[1]);
+  if (parts.length >= 3) out.shelf = num(parts[2]);
+  return out;
+}
+
+function formatMapPosition_(loc) {
+  var r = loc.gridRow;
+  var c = loc.gridCol;
+  var s = loc.shelf;
+  if (r == null || c == null || r === '' || c === '') {
+    if (s != null && s !== '') return ',,' + s;
+    return '';
+  }
+  var parts = [String(r), String(c)];
+  if (s != null && s !== '') parts.push(String(s));
+  return parts.join(',');
+}
+
+function getAllLocations_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
+  if (!sheet) return [];
+  var values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
-  const headers = values[0];
-  return values.slice(1).map((row) => rowToProduct_(headers, row));
+  var headers = values[0].map(String);
+  var list = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    if (!row[0]) continue;
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = row[j];
+    }
+    var pos = parseMapPosition_(obj.mapPosition);
+    list.push({
+      id: String(obj.id),
+      name: String(obj.name || ''),
+      code: obj.code ? String(obj.code) : undefined,
+      notes: obj.notes ? String(obj.notes) : undefined,
+      gridRow: pos.gridRow || undefined,
+      gridCol: pos.gridCol || undefined,
+      shelf: pos.shelf || undefined,
+      mapPosition: obj.mapPosition ? String(obj.mapPosition) : '',
+      createdAt: obj.createdAt ? String(obj.createdAt) : '',
+      updatedAt: obj.updatedAt ? String(obj.updatedAt) : '',
+    });
+  }
+  return list;
 }
 
-function getProductById_(id) {
-  const products = getAllProducts_();
-  return products.find((p) => p.id === id) || null;
-}
+function saveLocation_(incoming) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATIONS);
+  if (!sheet) throw new Error('Locations sheet missing — run initializeSheets()');
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0].map(String);
+  var now = new Date().toISOString();
 
-function saveProduct_(incoming) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PRODUCTS);
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0];
-  const now = new Date().toISOString();
-
-  let id = incoming.id;
-  let rowIndex = -1; // 1-based for sheet
-
+  var id = incoming.id;
+  var rowIndex = -1;
   if (id) {
-    for (let i = 1; i < values.length; i++) {
+    for (var i = 1; i < values.length; i++) {
       if (String(values[i][0]) === String(id)) {
         rowIndex = i + 1;
         break;
@@ -155,10 +251,140 @@ function saveProduct_(incoming) {
     }
   }
 
+  var mapPos = incoming.mapPosition;
+  if (mapPos === undefined || mapPos === null) {
+    mapPos = formatMapPosition_({
+      gridRow: incoming.gridRow,
+      gridCol: incoming.gridCol,
+      shelf: incoming.shelf,
+    });
+  }
+  var parsed = parseMapPosition_(mapPos);
+
+  var loc = {
+    id: id || Utilities.getUuid(),
+    name: incoming.name || '',
+    code: incoming.code || '',
+    mapPosition: mapPos || '',
+    notes: incoming.notes || '',
+    gridRow: parsed.gridRow || undefined,
+    gridCol: parsed.gridCol || undefined,
+    shelf: parsed.shelf || undefined,
+    createdAt: now,
+    updatedAt: now,
+  };
+
   if (rowIndex === -1) {
-    // Create
+    sheet.appendRow(locationToRow_(headers, loc));
+    return loc;
+  }
+
+  var existing = {};
+  for (var j = 0; j < headers.length; j++) {
+    existing[headers[j]] = values[rowIndex - 1][j];
+  }
+  loc.createdAt = existing.createdAt ? String(existing.createdAt) : now;
+  loc.updatedAt = now;
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([locationToRow_(headers, loc)]);
+  return loc;
+}
+
+function locationToRow_(headers, loc) {
+  return headers.map(function (h) {
+    if (h === 'mapPosition') return loc.mapPosition || formatMapPosition_(loc) || '';
+    var v = loc[h];
+    return v === undefined || v === null ? '' : v;
+  });
+}
+
+function deleteLocation_(id) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_LOCATIONS);
+  if (!sheet) return;
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      break;
+    }
+  }
+  var lp = ss.getSheetByName(SHEET_LOCATION_PRODUCTS);
+  if (!lp) return;
+  var lpValues = lp.getDataRange().getValues();
+  for (var k = lpValues.length - 1; k >= 1; k--) {
+    if (String(lpValues[k][0]) === String(id)) {
+      lp.deleteRow(k + 1);
+    }
+  }
+}
+
+function getLocationProducts_(locationId) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATION_PRODUCTS);
+  if (!sheet) return [];
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  var list = [];
+  for (var i = 1; i < values.length; i++) {
+    var locId = String(values[i][0] || '');
+    var prodId = String(values[i][1] || '');
+    if (!locId || !prodId) continue;
+    if (locationId && locId !== String(locationId)) continue;
+    list.push({ locationId: locId, productId: prodId });
+  }
+  return list;
+}
+
+function setLocationProducts_(locationId, productIds) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOCATION_PRODUCTS);
+  if (!sheet) throw new Error('LocationProducts sheet missing — run initializeSheets()');
+  var values = sheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][0]) === String(locationId)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  for (var j = 0; j < productIds.length; j++) {
+    var pid = productIds[j];
+    if (pid) sheet.appendRow([locationId, pid]);
+  }
+}
+
+function getAllProducts_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PRODUCTS);
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  var headers = values[0];
+  return values.slice(1).map(function (row) {
+    return rowToProduct_(headers, row);
+  });
+}
+
+function getProductById_(id) {
+  var products = getAllProducts_();
+  for (var i = 0; i < products.length; i++) {
+    if (String(products[i].id) === String(id)) return products[i];
+  }
+  return null;
+}
+
+function saveProduct_(incoming) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PRODUCTS);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var now = new Date().toISOString();
+  var id = incoming.id;
+  var rowIndex = -1;
+  if (id) {
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][0]) === String(id)) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+  }
+  if (rowIndex === -1) {
     id = id || Utilities.getUuid();
-    const product = {
+    var product = {
       id: id,
       name: incoming.name || '',
       sku: incoming.sku || '',
@@ -176,11 +402,9 @@ function saveProduct_(incoming) {
     sheet.appendRow(productToRow_(headers, product));
     return product;
   }
-
-  // Update
-  const existing = rowToProduct_(headers, values[rowIndex - 1]);
-  const product = {
-    ...existing,
+  var existing = rowToProduct_(headers, values[rowIndex - 1]);
+  var product2 = {
+    id: existing.id,
     name: incoming.name !== undefined ? incoming.name : existing.name,
     sku: incoming.sku !== undefined ? incoming.sku : existing.sku,
     barcode: incoming.barcode !== undefined ? incoming.barcode : existing.barcode,
@@ -191,84 +415,81 @@ function saveProduct_(incoming) {
     reorderPoint: incoming.reorderPoint !== undefined ? Number(incoming.reorderPoint) : existing.reorderPoint,
     notes: incoming.notes !== undefined ? incoming.notes : existing.notes,
     imageUrl: incoming.imageUrl !== undefined ? incoming.imageUrl : existing.imageUrl,
+    createdAt: existing.createdAt,
     updatedAt: now,
   };
-  const row = productToRow_(headers, product);
-  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([row]);
-  return product;
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([productToRow_(headers, product2)]);
+  return product2;
 }
 
 function deleteProduct_(id) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const productSheet = ss.getSheetByName(SHEET_PRODUCTS);
-  const values = productSheet.getDataRange().getValues();
-
-  for (let i = values.length - 1; i >= 1; i--) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var productSheet = ss.getSheetByName(SHEET_PRODUCTS);
+  var values = productSheet.getDataRange().getValues();
+  for (var i = values.length - 1; i >= 1; i--) {
     if (String(values[i][0]) === String(id)) {
       productSheet.deleteRow(i + 1);
       break;
     }
   }
-
-  // Also delete related movements
-  const movSheet = ss.getSheetByName(SHEET_MOVEMENTS);
-  const movValues = movSheet.getDataRange().getValues();
-  for (let i = movValues.length - 1; i >= 1; i--) {
-    if (String(movValues[i][1]) === String(id)) {
-      movSheet.deleteRow(i + 1);
+  var movSheet = ss.getSheetByName(SHEET_MOVEMENTS);
+  var movValues = movSheet.getDataRange().getValues();
+  for (var j = movValues.length - 1; j >= 1; j--) {
+    if (String(movValues[j][1]) === String(id)) {
+      movSheet.deleteRow(j + 1);
     }
   }
 }
 
 function rowToProduct_(headers, row) {
-  const obj = {};
-  headers.forEach((h, i) => {
-    obj[h] = row[i];
-  });
+  var obj = {};
+  for (var i = 0; i < headers.length; i++) {
+    obj[headers[i]] = row[i];
+  }
   obj.quantity = Number(obj.quantity) || 0;
   obj.reorderPoint = Number(obj.reorderPoint) || 0;
-  // Normalize empty strings to undefined for optional fields
-  ['barcode', 'customId', 'category', 'location', 'notes', 'imageUrl'].forEach((k) => {
+  ['barcode', 'customId', 'category', 'location', 'notes', 'imageUrl'].forEach(function (k) {
     if (obj[k] === '') obj[k] = undefined;
   });
   return obj;
 }
 
 function productToRow_(headers, product) {
-  return headers.map((h) => {
-    const v = product[h];
+  return headers.map(function (h) {
+    var v = product[h];
     return v === undefined || v === null ? '' : v;
   });
 }
 
-// ---------- Movements ----------
 function getMovements_(productId) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MOVEMENTS);
-  const values = sheet.getDataRange().getValues();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MOVEMENTS);
+  var values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
-  const headers = values[0];
-  let list = values.slice(1).map((row) => {
-    const obj = {};
-    headers.forEach((h, i) => (obj[h] = row[i]));
+  var headers = values[0];
+  var list = values.slice(1).map(function (row) {
+    var obj = {};
+    for (var i = 0; i < headers.length; i++) obj[headers[i]] = row[i];
     obj.change = Number(obj.change) || 0;
     return obj;
   });
   if (productId) {
-    list = list.filter((m) => String(m.productId) === String(productId));
+    list = list.filter(function (m) {
+      return String(m.productId) === String(productId);
+    });
   }
-  list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  list.sort(function (a, b) {
+    return String(b.createdAt).localeCompare(String(a.createdAt));
+  });
   return list;
 }
 
 function adjustStock_(productId, change, reason) {
-  const product = getProductById_(productId);
+  var product = getProductById_(productId);
   if (!product) throw new Error('Product not found');
-
-  const newQty = Math.max(0, Number(product.quantity) + Number(change));
+  var newQty = Math.max(0, Number(product.quantity) + Number(change));
   product.quantity = newQty;
-  const saved = saveProduct_(product);
-
-  const movSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MOVEMENTS);
+  var saved = saveProduct_(product);
+  var movSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_MOVEMENTS);
   movSheet.appendRow([
     Utilities.getUuid(),
     productId,
@@ -276,15 +497,13 @@ function adjustStock_(productId, change, reason) {
     reason || '',
     new Date().toISOString(),
   ]);
-
   return saved;
 }
 
-// ---------- QR Mapping Config ----------
 function getQRMapping_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIG);
-  const values = sheet.getDataRange().getValues();
-  for (let i = 1; i < values.length; i++) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIG);
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
     if (values[i][0] === 'qrMapping') {
       try {
         return JSON.parse(values[i][1]);
@@ -296,16 +515,15 @@ function getQRMapping_() {
   return {
     primaryLookupField: 'sku',
     fillFields: ['sku', 'barcode'],
-    payloadParser: 'plain',
+    payloadParser: 'json',
   };
 }
 
 function saveQRMapping_(config) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIG);
-  const values = sheet.getDataRange().getValues();
-  const json = JSON.stringify(config);
-
-  for (let i = 1; i < values.length; i++) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CONFIG);
+  var values = sheet.getDataRange().getValues();
+  var json = JSON.stringify(config);
+  for (var i = 1; i < values.length; i++) {
     if (values[i][0] === 'qrMapping') {
       sheet.getRange(i + 1, 2).setValue(json);
       return;
