@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Building2, MapPin, Tags } from 'lucide-react';
-import { seedMastersIfEmpty } from '../../store/mastersStore';
 import { LocationsPanel } from './LocationsPanel';
 import { CategoriesPanel } from './CategoriesPanel';
 import { PartnersPanel } from './PartnersPanel';
@@ -9,10 +8,6 @@ type Tab = 'locations' | 'categories' | 'partners';
 
 export function Masters() {
   const [tab, setTab] = useState<Tab>('locations');
-
-  useEffect(() => {
-    seedMastersIfEmpty();
-  }, []);
 
   const tabs: { id: Tab; label: string; icon: typeof MapPin }[] = [
     { id: 'locations', label: 'Locations', icon: MapPin },
@@ -33,6 +28,7 @@ export function Masters() {
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
+            type="button"
             onClick={() => setTab(id)}
             className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
               tab === id
