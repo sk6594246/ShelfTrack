@@ -84,10 +84,6 @@ export function getLocationById(id: string): Location | undefined {
   return getLocations().find((l) => l.id === id);
 }
 
-/**
- * Pull Locations (+ product links) from Google Sheets into localStorage.
- * Call on Masters / Stock mount when GAS is enabled.
- */
 export async function hydrateLocationsFromGas(): Promise<Location[]> {
   if (!isGasEnabled()) return getLocations();
   try {
@@ -108,7 +104,6 @@ export async function hydrateLocationsFromGas(): Promise<Location[]> {
       };
     });
     saveLocal(LOCATIONS_KEY, mapped);
-
     try {
       const links = await gasGetLocationProducts();
       saveLocal(LOCATION_PRODUCTS_KEY, links);
@@ -233,6 +228,24 @@ export function getLocationsForProduct(productId: string): string[] {
   return loadLocal<LocationProduct[]>(LOCATION_PRODUCTS_KEY, [])
     .filter((lp) => lp.productId === productId)
     .map((lp) => lp.locationId);
+}
+
+/** Assigned locations as full Location objects (for dropdowns). */
+export function getAssignedLocationsForProduct(productId: string): Location[] {
+  return getLocationsForProduct(productId)
+    .map((id) => getLocationById(id))
+    .filter((l): l is Location => !!l);
+}
+
+/** Seed empty masters with sample data (no-op if data exists). */
+export function seedMastersIfEmpty(): void {
+  if (getLocations().length === 0) {
+    saveLocation({ name: 'Shelf A1', code: 'A1', gridRow: 1, gridCol: 1, shelf: 1 });
+    saveLocation({ name: 'Shelf A2', code: 'A2', gridRow: 1, gridCol: 2, shelf: 1 });
+  }
+  if (getCategories().length === 0) {
+    saveCategory({ name: 'General' });
+  }
 }
 
 export function getCategories(): Category[] {
