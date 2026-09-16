@@ -8,16 +8,21 @@ import {
 } from '../store/mastersStore';
 import { getStoreLayout } from '../store/layoutStore';
 import {
-  getAvailableQtyAtLocation,
+  getAvailableQtyForProductAtLocation,
+  getLocatedQtyForProductEntity,
   getBatches,
+  batchBelongsToProduct,
 } from '../store/stockBatchStore';
 import type { Location, Product } from '../types/inventory';
 
-function firstGrDate(productId: string, locationId: string): string | null {
+function firstGrDate(
+  product: Pick<Product, 'id' | 'sku' | 'sourceId'>,
+  locationId: string
+): string | null {
   const batches = getBatches()
     .filter(
       (b) =>
-        b.productId === productId &&
+        batchBelongsToProduct(b.productId, product) &&
         b.locationId === locationId &&
         b.remaining > 0
     )
@@ -63,11 +68,11 @@ export function StockMap() {
       .finally(() => setLoading(false));
   }, []);
 
-  const selected = products.find((p) => p.id === productId);
+  const selectedProduct = products.find((p) => p.id === productId);
 
   const cellData = useMemo(() => {
     const map = new Map<string, CellShelf[]>();
-    if (!productId) return map;
+    if (!productId || !selectedProduct) return map;
 
     const assignedIds = new Set(
       locations
@@ -81,15 +86,15 @@ export function StockMap() {
       if (loc.gridRow > layout.rows || loc.gridCol > layout.cols) continue;
 
       const key = `${loc.gridRow}-${loc.gridCol}`;
-      const qty = getAvailableQtyAtLocation(productId, loc.id);
+      const qty = getAvailableQtyForProductAtLocation(selectedProduct, loc.id);
       const assigned = assignedIds.has(loc.id);
-      const firstGr = qty > 0 ? firstGrDate(productId, loc.id) : null;
+      const firstGr = qty > 0 ? firstGrDate(selectedProduct, loc.id) : null;
       let earliestExpiry: string | null = null;
       if (qty > 0) {
         const exp = getBatches()
           .filter(
             (b) =>
-              b.productId === productId &&
+              batchBelongsToProduct(b.productId, selectedProduct) &&
               b.locationId === loc.id &&
               b.remaining > 0 &&
               b.expiryDate
@@ -107,7 +112,7 @@ export function StockMap() {
       list.sort((a, b) => (a.location.shelf || 1) - (b.location.shelf || 1));
     }
     return map;
-  }, [productId, locations, layout.rows, layout.cols]);
+  }, [productId, selectedProduct, locations, layout.rows, layout.cols]);
 
   const maxQty = useMemo(() => {
     let m = 0;
@@ -132,8 +137,8 @@ export function StockMap() {
   }, [cellTotals]);
 
   const unmapped = useMemo(() => {
-    if (!productId) return [];
-    return locations.filter(
+    if (!productId || !selectedProduct) return [];
+    const off = locations.filter(
       (loc) =>
         loc.gridRow == null ||
         loc.gridCol == null ||
@@ -142,7 +147,30 @@ export function StockMap() {
         loc.gridRow > layout.rows ||
         loc.gridCol > layout.cols
     );
-  }, [productId, locations, layout]);
+    return [...off].sort((a, b) => {
+      const qa = getAvailableQtyForProductAtLocation(selectedProduct, a.id);
+      const qb = getAvailableQtyForProductAtLocation(selectedProduct, b.id);
+      return qb - qa || a.name.localeCompare(b.name);
+    });
+  }, [productId, selectedProduct, locations, layout]);
+
+  const stockSummary = useMemo(() => {
+    if (!selectedProduct) return null;
+    const located = getLocatedQtyForProductEntity(selectedProduct);
+    const onGrid = [...cellData.values()].reduce(
+      (s, list) => s + list.reduce((x, c) => x + c.qty, 0),
+      0
+    );
+    const offGrid = Math.max(0, located - onGrid);
+    const unlocated = Math.max(0, selectedProduct.quantity - located);
+    return {
+      productQty: selectedProduct.quantity,
+      located,
+      onGrid,
+      offGrid,
+      unlocated,
+    };
+  }, [selectedProduct, cellData]);
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
@@ -204,12 +232,52 @@ export function StockMap() {
         </div>
       ) : (
         <>
-          {selected && (
-            <p className="mb-3 text-sm text-slate-600">
-              Showing <span className="font-semibold text-slate-900">{selected.name}</span>{' '}
-              <span className="text-slate-400">({selected.sku})</span>
-              {heatMode && <span className="ml-2 text-orange-600">· heat density</span>}
-            </p>
+          {selectedProduct && stockSummary && (
+            <div className="mb-3 space-y-2">
+              <p className="text-sm text-slate-600">
+                Showing{' '}
+                <span className="font-semibold text-slate-900">{selectedProduct.name}</span>{' '}
+                <span className="text-slate-400">({selectedProduct.sku})</span>
+                {heatMode && (
+                  <span className="ml-2 text-orange-600">· heat density</span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                <span className="rounded-lg bg-slate-100 px-2 py-1 text-slate-700">
+                  Product total {stockSummary.productQty}
+                </span>
+                <span className="rounded-lg bg-indigo-50 px-2 py-1 text-indigo-800">
+                  On grid {stockSummary.onGrid}
+                </span>
+                <span
+                  className={`rounded-lg px-2 py-1 ${
+                    stockSummary.offGrid > 0
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-slate-50 text-slate-500'
+                  }`}
+                >
+                  Off grid {stockSummary.offGrid}
+                </span>
+                <span
+                  className={`rounded-lg px-2 py-1 ${
+                    stockSummary.unlocated > 0
+                      ? 'bg-rose-50 text-rose-800'
+                      : 'bg-slate-50 text-slate-500'
+                  }`}
+                >
+                  No location {stockSummary.unlocated}
+                </span>
+              </div>
+              {stockSummary.offGrid > 0 && (
+                <p className="text-xs text-amber-700">
+                  Some stock sits on locations without a map cell. Set{' '}
+                  <Link to="/masters" className="font-semibold underline">
+                    Masters → Locations
+                  </Link>{' '}
+                  grid row/col so they appear on the map.
+                </p>
+              )}
+            </div>
           )}
 
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -290,9 +358,7 @@ export function StockMap() {
                                 </div>
                                 <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-200/80">
                                   <div
-                                    className={`h-full rounded-full transition-all ${
-                                      s.qty > 0 ? 'bg-indigo-500' : 'bg-slate-300'
-                                    }`}
+                                    className={`h-full rounded-full ${s.qty > 0 ? 'bg-indigo-500' : 'bg-slate-300'}`}
                                     style={{
                                       width: `${s.qty > 0 ? Math.max(fill, 8) : 0}%`,
                                     }}
@@ -337,15 +403,26 @@ export function StockMap() {
 
           {unmapped.length > 0 && (
             <section className="mt-6">
-              <h2 className="mb-2 text-sm font-semibold text-slate-800">Locations not on grid</h2>
+              <h2 className="mb-2 text-sm font-semibold text-slate-800">
+                Locations not on grid
+              </h2>
               <ul className="grid gap-2 sm:grid-cols-2">
                 {unmapped.map((loc) => {
-                  const qty = getAvailableQtyAtLocation(productId, loc.id);
-                  const gr = qty > 0 ? firstGrDate(productId, loc.id) : null;
+                  const qty = selectedProduct
+                    ? getAvailableQtyForProductAtLocation(selectedProduct, loc.id)
+                    : 0;
+                  const gr =
+                    qty > 0 && selectedProduct
+                      ? firstGrDate(selectedProduct, loc.id)
+                      : null;
                   return (
                     <li
                       key={loc.id}
-                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                      className={`flex items-center justify-between rounded-xl border px-3 py-2 text-sm ${
+                        qty > 0
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-slate-200 bg-white'
+                      }`}
                     >
                       <span className="font-medium text-slate-800">
                         {loc.name}
@@ -353,7 +430,11 @@ export function StockMap() {
                           <span className="ml-1 text-xs text-slate-400">({loc.code})</span>
                         ) : null}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span
+                        className={`text-xs font-semibold ${
+                          qty > 0 ? 'text-amber-900' : 'text-slate-500'
+                        }`}
+                      >
                         {qty > 0 ? (
                           <>
                             qty {qty}
