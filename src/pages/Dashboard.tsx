@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  
   AlertTriangle,
   ArrowRight,
   Boxes,
@@ -16,8 +15,6 @@ import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/product/ProductCard';
 import { getLocations, getProductsForLocation, getLocationById } from '../store/mastersStore';
 import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
-//import type { Product } from '../types/inventory';
-import type { InventoryItem } from '../types/inventory';
 
 const LOC_KEY = 'st_dash_location';
 
@@ -258,7 +255,7 @@ export function Dashboard() {
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">{r.product?.name || 'Product'}</p>
                   <p className="truncate text-[11px] text-slate-400">
-                    {r.location?.name || '—'}
+                    {r.location?.name || '-'}
                     {r.location?.code ? ` (${r.location.code})` : ''} · qty {r.remaining}
                   </p>
                 </div>
