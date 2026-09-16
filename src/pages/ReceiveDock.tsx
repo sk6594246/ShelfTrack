@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { getProducts } from '../store/inventoryStore';
-import { getPartners, getLocationsForProduct } from '../store/mastersStore';
+import {
+  getPartners,
+  getLocationsForProduct,
+  getLocationById,
+} from '../store/mastersStore';
 import {
   createDocument,
   addLine,
@@ -30,12 +34,16 @@ export function ReceiveDock() {
 
   useEffect(() => {
     getProducts().then(setProducts);
-    setPartners(getPartners().filter((p: BusinessPartner) => p.roles.includes('supplier')));
+    setPartners(
+      getPartners().filter((p: BusinessPartner) => p.roles.includes('supplier'))
+    );
   }, []);
 
   const locations = useMemo(() => {
     if (!productId) return [] as Location[];
-    return getLocationsForProduct(productId);
+    return getLocationsForProduct(productId)
+      .map((id) => getLocationById(id))
+      .filter((l): l is Location => !!l);
   }, [productId]);
 
   useEffect(() => {
