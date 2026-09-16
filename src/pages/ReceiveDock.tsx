@@ -160,7 +160,7 @@ export function ReceiveDock() {
           />
         </label>
 
-      <div className="grid grid-cols-3 gap-2">
+<div className="grid grid-cols-3 gap-2">
         <label className="block">
           <span className="text-[10px] font-semibold uppercase text-slate-400">Purchase</span>
           <input 
