@@ -103,18 +103,40 @@ export function LocationsPanel() {
       return;
     }
     try {
+      const parseGrid = (s: string) => {
+        const t = s.trim();
+        if (!t) return undefined;
+        const n = Number(t);
+        return Number.isFinite(n) && n >= 1 ? Math.round(n) : undefined;
+      };
+      const nextRow = parseGrid(gridRow);
+      const nextCol = parseGrid(gridCol);
+      const nextShelf = parseGrid(shelf);
       const saved = saveLocation({
         id: editing?.id,
         name,
         code: code || undefined,
         notes: notes || undefined,
-        gridRow: gridRow ? Number(gridRow) : undefined,
-        gridCol: gridCol ? Number(gridCol) : undefined,
-        shelf: shelf ? Number(shelf) : undefined,
+        gridRow: nextRow,
+        gridCol: nextCol,
+        shelf: nextShelf,
       });
       setProductsForLocation(saved.id, assignedIds);
-      toast(editing ? 'Location updated' : 'Location created', 'success');
-      closeForm();
+      const cell =
+        saved.gridRow != null && saved.gridCol != null
+          ? `R${saved.gridRow}C${saved.gridCol}`
+          : 'off-grid';
+      toast(
+        editing
+          ? `Location updated · ${cell}${saved.shelf ? ` · S${saved.shelf}` : ''}`
+          : `Location created · ${cell}`,
+        'success'
+      );
+      setEditing(saved);
+      setCreating(false);
+      setGridRow(saved.gridRow != null ? String(saved.gridRow) : '');
+      setGridCol(saved.gridCol != null ? String(saved.gridCol) : '');
+      setShelf(saved.shelf != null ? String(saved.shelf) : '1');
       reload();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -358,9 +380,16 @@ export function LocationsPanel() {
                     </label>
                   </div>
                   <p className="mt-2 text-[11px] text-slate-500">
-                    Example: row 1, col 1, shelf 2 = 2nd shelf in cell R1C1. Same
-                    cell can have shelf 1 and shelf 2 as separate locations.
+                    Example: row 1, col 1, shelf 2 = 2nd shelf in cell R1C1.
                     Leave row/col empty to keep off the map.
+                  </p>
+                  <p className="mt-2 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-indigo-800 ring-1 ring-indigo-100">
+                    Preview:{' '}
+                    {gridRow.trim() && gridCol.trim()
+                      ? `R${gridRow.trim()}C${gridCol.trim()}${
+                          shelf.trim() ? ` · S${shelf.trim()}` : ''
+                        }`
+                      : 'off-grid (set row + col, then Save)'}
                   </p>
                 </div>
 
@@ -418,12 +447,12 @@ export function LocationsPanel() {
                   </div>
                 </div>
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="sticky bottom-0 z-10 -mx-5 mt-5 flex flex-wrap gap-2 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur">
                 <button
                   type="submit"
                   className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
                 >
-                  Save
+                  Save location
                 </button>
                 {editing && (
                   <>
