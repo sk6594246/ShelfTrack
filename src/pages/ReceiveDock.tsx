@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { getProducts } from '../store/inventoryStore';
-import { getPartners, getAssignedLocationsForProduct } from '../store/mastersStore';
+import { getPartners, getLocationsForProduct } from '../store/mastersStore';
 import {
   createDocument,
   addLine,
@@ -30,12 +30,12 @@ export function ReceiveDock() {
 
   useEffect(() => {
     getProducts().then(setProducts);
-    setPartners(getPartners().filter((p) => p.roles.includes('supplier')));
+    setPartners(getPartners().filter((p: BusinessPartner) => p.roles.includes('supplier')));
   }, []);
 
   const locations = useMemo(() => {
     if (!productId) return [] as Location[];
-    return getAssignedLocationsForProduct(productId);
+    return getLocationsForProduct(productId);
   }, [productId]);
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export function ReceiveDock() {
             className="mt-1 w-full appearance-auto rounded-xl border border-slate-200 px-3 py-3 text-base"
           >
             <option value="">— None —</option>
-            {partners.map((p) => (
+            {partners.map((p: BusinessPartner) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -141,7 +141,7 @@ export function ReceiveDock() {
             required
           >
             <option value="">Select product…</option>
-            {products.map((p) => (
+            {products.map((p: Product) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.sku})
               </option>
@@ -200,7 +200,7 @@ export function ReceiveDock() {
             required
           >
             <option value="">{!productId ? 'Select product first…' : 'Choose bin / shelf…'}</option>
-            {locations.map((loc) => (
+            {locations.map((loc: Location) => (
               <option key={loc.id} value={loc.id}>
                 {loc.name}
                 {loc.code ? ` (${loc.code})` : ''}
