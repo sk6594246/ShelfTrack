@@ -160,22 +160,35 @@ export function ReceiveDock() {
           />
         </label>
 
-        <div className="grid grid-cols-3 gap-2">
-          <label className="block">
-            <span className="text-[10px] font-semibold uppercase text-slate-400">Purchase</span>
-            <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)}\n              className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
-          </label>
-          <label className="block">
-            <span className="text-[10px] font-semibold uppercase text-slate-400">Mfg</span>
-            <input type="date" value={mfgDate} onChange={(e) => setMfgDate(e.target.value)}
-              className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
-          </label>
-          <label className="block">
-            <span className="text-[10px] font-semibold uppercase text-slate-400">Expiry</span>
-            <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)}
-              className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
-          </label>
-        </div>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="block">
+          <span className="text-[10px] font-semibold uppercase text-slate-400">Purchase</span>
+          <input 
+            type="date" 
+            value={purchaseDate} 
+            onChange={(e) => setPurchaseDate(e.target.value)}
+            className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" 
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold uppercase text-slate-400">Mfg</span>
+          <input 
+            type="date" 
+            value={mfgDate} 
+            onChange={(e) => setMfgDate(e.target.value)}
+            className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" 
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-semibold uppercase text-slate-400">Expiry</span>
+          <input 
+            type="date" 
+            value={expiryDate} 
+            onChange={(e) => setExpiryDate(e.target.value)}
+            className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" 
+          />
+        </label>
+      </div>
 
         <label className="block">
           <span className="text-xs font-semibold text-slate-500">Put-away location *</span>
