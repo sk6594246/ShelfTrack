@@ -117,7 +117,12 @@ export function PartnersPanel() {
         notes: notes || undefined,
         roles,
       });
-      setProductsForPartner(saved.id, linked);
+      for (const role of (['supplier', 'customer'] as PartnerRole[])) {
+        const ids = roles.includes(role)
+          ? linked.filter((x) => x.role === role).map((x) => x.productId)
+          : [];
+        setProductsForPartner(saved.id, ids, role);
+      }
       toast(editing ? 'Partner updated' : 'Partner created', 'success');
       closeForm();
       reload();
@@ -157,7 +162,7 @@ export function PartnersPanel() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search partners…"
+            placeholder="Search partners..."
             className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
@@ -290,17 +295,13 @@ export function PartnersPanel() {
               </label>
               {roles.length > 0 && products.length > 0 && (
                 <div>
-                  <span className="text-xs font-semibold text-slate-500">
-                    Linked products
-                  </span>
+                  <span className="text-xs font-semibold text-slate-500">Linked products</span>
                   <div className="mt-2 max-h-52 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-2">
                     {products.map((p) => (
                       <div key={p.id} className="rounded-lg bg-slate-50 px-2 py-2">
                         <p className="truncate text-sm font-medium text-slate-800">
                           {p.name}{' '}
-                          <span className="text-xs font-normal text-slate-400">
-                            ({p.sku})
-                          </span>
+                          <span className="text-xs font-normal text-slate-400">({p.sku})</span>
                         </p>
                         <div className="mt-1 flex gap-3">
                           {roles.map((r) => (
