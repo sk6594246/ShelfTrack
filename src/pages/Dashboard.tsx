@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  
   AlertTriangle,
   ArrowRight,
   Boxes,
@@ -16,6 +17,7 @@ import { ProductCard } from '../components/product/ProductCard';
 import { getLocations, getProductsForLocation, getLocationById } from '../store/mastersStore';
 import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
 //import type { Product } from '../types/inventory';
+import type { InventoryItem } from '../types/inventory';
 
 const LOC_KEY = 'st_dash_location';
 
