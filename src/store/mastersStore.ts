@@ -1,4 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
+import {
+  isGasEnabled,
+  gasGetLocations,
+  gasSaveLocation,
+  gasDeleteLocation,
+  gasGetLocationProducts,
+  gasSetLocationProducts,
+} from '../lib/gasApi';
 import type {
   Location,
   Category,
@@ -33,6 +41,39 @@ function optionalGrid(n: number | undefined | null): number | undefined {
   return v >= 1 ? v : undefined;
 }
 
+/** Serialize grid for Sheets: "row,col,shelf" */
+export function formatMapPosition(loc: {
+  gridRow?: number;
+  gridCol?: number;
+  shelf?: number;
+}): string {
+  if (loc.gridRow == null || loc.gridCol == null) {
+    return loc.shelf != null ? `,,${loc.shelf}` : '';
+  }
+  const parts = [String(loc.gridRow), String(loc.gridCol)];
+  if (loc.shelf != null) parts.push(String(loc.shelf));
+  return parts.join(',');
+}
+
+export function parseMapPosition(raw?: string | null): {
+  gridRow?: number;
+  gridCol?: number;
+  shelf?: number;
+} {
+  if (!raw || !String(raw).trim()) return {};
+  const parts = String(raw).split(',');
+  const num = (s?: string) => {
+    if (s == null || !String(s).trim()) return undefined;
+    const n = Number(String(s).trim());
+    return Number.isFinite(n) && n >= 1 ? Math.round(n) : undefined;
+  };
+  return {
+    gridRow: num(parts[0]),
+    gridCol: num(parts[1]),
+    shelf: num(parts[2]),
+  };
+}
+
 export function getLocations(): Location[] {
   return loadLocal<Location[]>(LOCATIONS_KEY, []).sort((a, b) =>
     a.name.localeCompare(b.name)
@@ -41,6 +82,44 @@ export function getLocations(): Location[] {
 
 export function getLocationById(id: string): Location | undefined {
   return getLocations().find((l) => l.id === id);
+}
+
+/**
+ * Pull Locations (+ product links) from Google Sheets into localStorage.
+ * Call on Masters / Stock mount when GAS is enabled.
+ */
+export async function hydrateLocationsFromGas(): Promise<Location[]> {
+  if (!isGasEnabled()) return getLocations();
+  try {
+    const remote = await gasGetLocations();
+    const now = new Date().toISOString();
+    const mapped: Location[] = remote.map((r) => {
+      const fromCsv = parseMapPosition(r.mapPosition);
+      return {
+        id: r.id,
+        name: r.name || '',
+        code: r.code || undefined,
+        notes: r.notes || undefined,
+        gridRow: r.gridRow ?? fromCsv.gridRow,
+        gridCol: r.gridCol ?? fromCsv.gridCol,
+        shelf: r.shelf ?? fromCsv.shelf,
+        createdAt: r.createdAt || now,
+        updatedAt: r.updatedAt || now,
+      };
+    });
+    saveLocal(LOCATIONS_KEY, mapped);
+
+    try {
+      const links = await gasGetLocationProducts();
+      saveLocal(LOCATION_PRODUCTS_KEY, links);
+    } catch {
+      /* links optional */
+    }
+    return mapped.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (e) {
+    console.warn('hydrateLocationsFromGas failed', e);
+    return getLocations();
+  }
 }
 
 export function saveLocation(
@@ -69,6 +148,7 @@ export function saveLocation(
     };
     list[idx] = updated;
     saveLocal(LOCATIONS_KEY, list);
+    void pushLocationToGas_(updated);
     return updated;
   }
 
@@ -85,7 +165,28 @@ export function saveLocation(
   };
   list.push(created);
   saveLocal(LOCATIONS_KEY, list);
+  void pushLocationToGas_(created);
   return created;
+}
+
+async function pushLocationToGas_(loc: Location): Promise<void> {
+  if (!isGasEnabled()) return;
+  try {
+    await gasSaveLocation({
+      id: loc.id,
+      name: loc.name,
+      code: loc.code || '',
+      notes: loc.notes || '',
+      gridRow: loc.gridRow,
+      gridCol: loc.gridCol,
+      shelf: loc.shelf,
+      mapPosition: formatMapPosition(loc),
+      createdAt: loc.createdAt,
+      updatedAt: loc.updatedAt,
+    });
+  } catch (e) {
+    console.warn('gasSaveLocation failed', e);
+  }
 }
 
 export function deleteLocation(id: string): void {
@@ -99,6 +200,11 @@ export function deleteLocation(id: string): void {
       (lp) => lp.locationId !== id
     )
   );
+  if (isGasEnabled()) {
+    void gasDeleteLocation(id).catch((e) =>
+      console.warn('gasDeleteLocation failed', e)
+    );
+  }
 }
 
 export function getProductsForLocation(locationId: string): string[] {
@@ -116,6 +222,11 @@ export function setProductsForLocation(locationId: string, productIds: string[])
     ...productIds.map((productId) => ({ locationId, productId })),
   ];
   saveLocal(LOCATION_PRODUCTS_KEY, next);
+  if (isGasEnabled()) {
+    void gasSetLocationProducts(locationId, productIds).catch((e) =>
+      console.warn('gasSetLocationProducts failed', e)
+    );
+  }
 }
 
 export function getLocationsForProduct(productId: string): string[] {
@@ -179,10 +290,7 @@ export function savePartner(
 ): BusinessPartner {
   const list = loadLocal<BusinessPartner[]>(PARTNERS_KEY, []);
   const now = new Date().toISOString();
-
-  if (!data.roles?.length) {
-    throw new Error('Select at least one role (supplier or customer)');
-  }
+  const roles = data.roles?.length ? data.roles : (['supplier'] as PartnerRole[]);
 
   if (data.id) {
     const idx = list.findIndex((p) => p.id === data.id);
@@ -192,10 +300,7 @@ export function savePartner(
       ...data,
       id: data.id,
       name: data.name.trim(),
-      code: data.code?.trim() || undefined,
-      phone: data.phone?.trim() || undefined,
-      email: data.email?.trim() || undefined,
-      notes: data.notes?.trim() || undefined,
+      roles,
       updatedAt: now,
     };
     list[idx] = updated;
@@ -206,7 +311,7 @@ export function savePartner(
   const created: BusinessPartner = {
     name: data.name.trim(),
     code: data.code?.trim() || undefined,
-    roles: data.roles,
+    roles,
     phone: data.phone?.trim() || undefined,
     email: data.email?.trim() || undefined,
     notes: data.notes?.trim() || undefined,
@@ -243,69 +348,21 @@ export function getProductsForPartner(
 
 export function setProductsForPartner(
   partnerId: string,
-  items: { productId: string; role: PartnerRole }[]
+  productIds: string[],
+  role: PartnerRole
 ): void {
   const others = loadLocal<PartnerProduct[]>(PARTNER_PRODUCTS_KEY, []).filter(
-    (pp) => pp.partnerId !== partnerId
+    (pp) => !(pp.partnerId === partnerId && pp.role === role)
   );
-  saveLocal(PARTNER_PRODUCTS_KEY, [
+  const next = [
     ...others,
-    ...items.map((i) => ({ partnerId, productId: i.productId, role: i.role })),
-  ]);
+    ...productIds.map((productId) => ({ partnerId, productId, role })),
+  ];
+  saveLocal(PARTNER_PRODUCTS_KEY, next);
 }
 
-export function seedMastersIfEmpty(): void {
-  if (getLocations().length === 0) {
-    const now = new Date().toISOString();
-    saveLocal(LOCATIONS_KEY, [
-      {
-        id: uuidv4(),
-        name: 'Shelf A1',
-        code: 'A1',
-        gridRow: 1,
-        gridCol: 1,
-        shelf: 1,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: uuidv4(),
-        name: 'Shelf A2',
-        code: 'A2',
-        gridRow: 1,
-        gridCol: 2,
-        shelf: 1,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: uuidv4(),
-        name: 'Shelf B3',
-        code: 'B3',
-        gridRow: 2,
-        gridCol: 3,
-        shelf: 1,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: uuidv4(),
-        name: 'Shelf C2',
-        code: 'C2',
-        gridRow: 3,
-        gridCol: 2,
-        shelf: 1,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ]);
-  }
-  if (getCategories().length === 0) {
-    const now = new Date().toISOString();
-    saveLocal(CATEGORIES_KEY, [
-      { id: uuidv4(), name: 'Electronics', createdAt: now, updatedAt: now },
-      { id: uuidv4(), name: 'Accessories', createdAt: now, updatedAt: now },
-      { id: uuidv4(), name: 'Stationery', createdAt: now, updatedAt: now },
-    ]);
-  }
+export function getPartnersForProduct(productId: string): PartnerProduct[] {
+  return loadLocal<PartnerProduct[]>(PARTNER_PRODUCTS_KEY, []).filter(
+    (pp) => pp.productId === productId
+  );
 }
