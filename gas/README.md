@@ -8,7 +8,9 @@ This folder contains the backend that uses **Google Sheets as the database**.
 React App  →  fetch POST  →  GAS Web App  →  Google Spreadsheet
                               (Code.gs)         ├── Products
                                                 ├── Movements
-                                                └── Config
+                                                ├── Config
+                                                ├── Locations
+                                                └── LocationProducts
 ```
 
 When `VITE_GAS_WEB_APP_URL` is set, the frontend uses GAS.  
@@ -34,10 +36,12 @@ When it is empty, the app falls back to browser `localStorage`.
 2. Click **Run**
 3. Authorize the script when prompted (Review permissions → Allow)
 4. You should see an alert “Sheets initialized successfully”
-5. Return to the spreadsheet — you will now have three tabs:
-   - **Products** (with headers)
-   - **Movements** (with headers)
-   - **Config** (with default QR mapping)
+5. Return to the spreadsheet — you will now have tabs:
+   - **Products**
+   - **Movements**
+   - **Config**
+   - **Locations** (`mapPosition` = `row,col,shelf`)
+   - **LocationProducts**
 
 ### 4. Deploy as Web App
 1. In Apps Script: **Deploy → New deployment**
@@ -74,37 +78,31 @@ If you edit `Code.gs` later:
 
 ### Config
 | key | value |
-| qrMapping | `{"primaryLookupField":"sku","fillFields":["sku","barcode"],"payloadParser":"plain"}` |
+| qrMapping | JSON config |
+
+### Locations
+| id | name | code | mapPosition | notes | createdAt | updatedAt |
+
+`mapPosition` = comma-separated **`row,col,shelf`** (1-based), e.g. `1,2,3` → grid R1C2 shelf 3.  
+Empty or incomplete (missing row/col) = off-grid. Shelf-only can be `,,2`.
+
+### LocationProducts
+| locationId | productId |
+
+Many-to-many: which products can be stored at a location.
+
+After updating Code.gs: run **initializeSheets()** again (safe), then **Deploy → Manage deployments → Edit → New version**.
 
 ---
 
 ## API actions (POST body)
 
 ```json
-{ "action": "getProducts" }
-{ "action": "getProduct", "id": "..." }
-{ "action": "saveProduct", "product": { ... } }
-{ "action": "deleteProduct", "id": "..." }
-{ "action": "getMovements", "productId": "..." }
-{ "action": "adjustStock", "productId": "...", "change": 5, "reason": "Received" }
-{ "action": "getQRMapping" }
-{ "action": "saveQRMapping", "config": { ... } }
+{ "action": "getLocations" }
+{ "action": "saveLocation", "location": { "id": "...", "name": "Shelf A1", "code": "A1", "mapPosition": "1,1,1" } }
+{ "action": "deleteLocation", "id": "..." }
+{ "action": "getLocationProducts" }
+{ "action": "setLocationProducts", "locationId": "...", "productIds": ["..."] }
 ```
 
-All responses are JSON. Errors return `{ "error": "message" }`.
-
----
-
-## Notes & limitations
-
-- GAS has daily quotas (generous for small/medium inventory apps).
-- Cold starts can add 1–3 seconds on the first request after idle.
-- For production multi-user use, consider adding a simple shared secret or Google sign-in check.
-- “Anyone” access means the URL is public — treat it like an unauthenticated API.
-- Do not put secrets in the Sheet; the Web App URL is the access control.
-
----
-
-## Switching back to localStorage
-
-Remove or empty `VITE_GAS_WEB_APP_URL` in `.env` and restart the dev server.
+Plus existing product/movement/QR actions.
