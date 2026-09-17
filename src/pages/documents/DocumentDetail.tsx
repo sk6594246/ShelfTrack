@@ -92,15 +92,15 @@ export function DocumentDetail() {
     return products;
   }, [doc, products]);
 
-  const locationOptions = useMemo(() => {
-    if (!doc || !productId) return [] as Location[];
+  const locationOptions = useMemo((): Location[] => {
+    if (!doc || !productId) return [];
     if (doc.type === 'purchase') {
       return getAssignedLocationsForProduct(productId);
     }
     if (doc.type === 'sale') {
       const fefo = getFefoLocationsForProduct(productId);
-      if (fefo.length) return fefo;
-      return getFifoLocationsForProduct(productId);
+      if (fefo.length) return fefo.map((r) => r.location);
+      return getFifoLocationsForProduct(productId).map((r) => r.location);
     }
     return allLocations;
   }, [doc, productId, allLocations]);
