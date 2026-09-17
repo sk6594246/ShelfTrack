@@ -13,7 +13,6 @@ import {
   getLocationById,
   getLocations,
   getProductsForLocation,
-  hydrateMastersFromGas,
 } from '../store/mastersStore';
 import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
 import { getDocuments } from '../store/documentsStore';
@@ -91,7 +90,7 @@ function SkeletonDashboard() {
 
 export function Dashboard() {
   const { products, loading } = useProducts();
-  const [locations, setLocations] = useState(() => getLocations());
+  const [locations, setLocations] = useState<import('../types/inventory').Location[]>([]);
   const [locationId, setLocationId] = useState(() => {
     try {
       return localStorage.getItem(LOC_KEY) || '';
@@ -104,14 +103,18 @@ export function Dashboard() {
     let cancelled = false;
     (async () => {
       try {
-        await hydrateMastersFromGas();
+        const locs = await getLocations();
+        if (!cancelled) setLocations(locs);
       } catch {
-        /* local */
+        if (!cancelled) setLocations([]);
       }
-      if (!cancelled) setLocations(getLocations());
     })();
     function onHydrated() {
-      if (!cancelled) setLocations(getLocations());
+      if (!cancelled) {
+        void getLocations().then((locs) => {
+          if (!cancelled) setLocations(locs);
+        });
+      }
     }
     window.addEventListener('st-masters-hydrated', onHydrated);
     return () => {
