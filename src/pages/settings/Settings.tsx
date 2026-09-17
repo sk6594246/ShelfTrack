@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Cloud, RefreshCw } from 'lucide-react';
 import { ChevronRight, QrCode, Trash2, Moon, Sun, Palette } from 'lucide-react';
 import { useQRMapping } from '../../hooks/useQRMapping';
 import { mappingSummary } from '../../lib/qr';
@@ -11,12 +12,18 @@ import {
   setThemeMode,
   type ThemeMode,
 } from '../../store/themeStore';
+import { isGasEnabled, getGasWebAppUrl } from '../../lib/gasApi';
+import { hydrateMastersFromGas } from '../../store/mastersStore';
+import { toast } from '../../components/ui/Toast';
 
 export function Settings() {
   const { config } = useQRMapping();
   const [mode, setMode] = useState<ThemeMode>(() => getThemeMode());
   const [accent, setAccentState] = useState(() => getAccent());
   const [customHex, setCustomHex] = useState(() => getAccent());
+  const gasOn = isGasEnabled();
+  const gasUrl = getGasWebAppUrl();
+  const [syncing, setSyncing] = useState(false);
 
   function clearAllData() {
     if (window.confirm('Delete all products and settings? This cannot be undone.')) {
@@ -42,7 +49,7 @@ export function Settings() {
           Settings
         </h1>
         <p className="mt-0.5 text-sm" style={{ color: 'var(--st-muted)' }}>
-          Theme, scanning, and data
+          Theme, sheet sync, scanning, and data
         </p>
       </header>
 
@@ -98,9 +105,6 @@ export function Settings() {
                 <Moon className="h-4 w-4" /> Night
               </button>
             </div>
-            <p className="mt-2 text-[11px]" style={{ color: 'var(--st-muted)' }}>
-              Night mode is tuned for low-light docks and floor tablets.
-            </p>
           </div>
 
           <div>
@@ -163,6 +167,71 @@ export function Settings() {
               </button>
             </label>
           </div>
+        </div>
+      </section>
+
+      <section className="mb-6">
+        <p
+          className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--st-muted)' }}
+        >
+          Google Sheet sync
+        </p>
+        <div
+          className="space-y-3 overflow-hidden rounded-2xl border p-4 shadow-sm"
+          style={{
+            background: 'var(--st-surface)',
+            borderColor: 'var(--st-border)',
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-xl"
+              style={{
+                background: gasOn ? 'var(--st-primary-soft)' : '#fef2f2',
+                color: gasOn ? 'var(--st-primary)' : '#e11d48',
+              }}
+            >
+              <Cloud className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold" style={{ color: 'var(--st-text)' }}>
+                {gasOn ? 'GAS connected' : 'GAS not configured'}
+              </p>
+              <p className="mt-0.5 text-xs break-all" style={{ color: 'var(--st-muted)' }}>
+                {gasOn
+                  ? gasUrl.slice(0, 48) + (gasUrl.length > 48 ? '…' : '')
+                  : 'Set VITE_GAS_WEB_APP_URL at build time, then redeploy. Without it, locations stay on this device only.'}
+              </p>
+            </div>
+          </div>
+          {gasOn && (
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true);
+                try {
+                  const locs = await hydrateMastersFromGas();
+                  window.dispatchEvent(
+                    new CustomEvent('st-masters-hydrated', {
+                      detail: { count: locs.length },
+                    })
+                  );
+                  toast(`Synced ${locs.length} location(s) from sheet`, 'success');
+                } catch (e) {
+                  toast(e instanceof Error ? e.message : 'Sync failed', 'error');
+                } finally {
+                  setSyncing(false);
+                }
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              style={{ background: 'var(--st-primary)' }}
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Pulling from sheet…' : 'Pull locations from sheet now'}
+            </button>
+          )}
         </div>
       </section>
 
