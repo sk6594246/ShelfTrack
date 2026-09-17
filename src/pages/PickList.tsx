@@ -117,9 +117,11 @@ export function PickList() {
   }
 
   const allPicked = rows.length > 0 && rows.every((r) => done.has(r.line.id));
+  const nextRow = rows.find((r) => !done.has(r.line.id)) ?? null;
+  const remaining = rows.filter((r) => !done.has(r.line.id)).length;
 
   return (
-    <div className="mx-auto w-full max-w-lg p-4 md:p-6">
+    <div className="mx-auto w-full max-w-lg p-4 pb-36 md:p-6">
       <button
         type="button"
         onClick={() => navigate(`/documents/${doc.id}`)}
@@ -151,15 +153,19 @@ export function PickList() {
       <ul className="space-y-2">
         {rows.map((r, i) => {
           const checked = done.has(r.line.id);
+          const isNext = nextRow?.line.id === r.line.id;
           return (
             <li key={r.line.id}>
               <button
                 type="button"
                 onClick={() => toggle(r.line.id)}
+                id={isNext ? 'pick-next' : undefined}
                 className={`flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition ${
                   checked
                     ? 'border-emerald-200 bg-emerald-50/80'
-                    : 'border-slate-200 bg-white hover:border-indigo-200'
+                    : isNext
+                      ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-200'
+                      : 'border-slate-200 bg-white hover:border-indigo-200'
                 }`}
               >
                 <span
@@ -170,7 +176,11 @@ export function PickList() {
                   {checked ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className={`font-semibold text-slate-900 ${checked ? 'line-through opacity-60' : ''}`}>
+                  <p
+                    className={`font-semibold text-slate-900 ${
+                      checked ? 'line-through opacity-60' : ''
+                    }`}
+                  >
                     {r.product?.name || 'Product'}
                   </p>
                   <p className="text-xs text-slate-400">{r.product?.sku}</p>
@@ -193,6 +203,36 @@ export function PickList() {
         <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-400">
           No lines on this document
         </p>
+      )}
+
+      {nextRow && doc.status === 'draft' && (
+        <div className="st-safe-bottom fixed bottom-16 left-0 right-0 z-20 border-t border-indigo-200 bg-indigo-600 px-4 py-3 text-white shadow-lg md:bottom-0">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
+                Next bin · {remaining} left
+              </p>
+              <p className="truncate text-sm font-semibold">
+                {nextRow.gridLabel} · {nextRow.locationLabel}
+              </p>
+              <p className="truncate text-xs text-indigo-100">
+                {nextRow.product?.name} × {nextRow.line.quantity}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                toggle(nextRow.line.id);
+                document
+                  .getElementById('pick-next')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+              className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-indigo-700"
+            >
+              Picked
+            </button>
+          </div>
+        </div>
       )}
 
       {error && (
