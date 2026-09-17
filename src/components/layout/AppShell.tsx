@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -18,6 +18,8 @@ import {
 import { CommandPalette } from '../CommandPalette';
 import { ToastHost } from '../ui/Toast';
 import { createDocument } from '../../store/documentsStore';
+import { hydrateMastersFromGas } from '../../store/mastersStore';
+import { isGasEnabled } from '../../lib/gasApi';
 
 const navItems = [
   { to: '/', label: 'Home', icon: Home, end: true },
@@ -38,6 +40,18 @@ export function AppShell() {
   const [opsOpen, setOpsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Cross-device: pull Locations + LocationProducts from Google Sheet into localStorage
+  useEffect(() => {
+    if (!isGasEnabled()) return;
+    void hydrateMastersFromGas()
+      .then((locs) => {
+        window.dispatchEvent(
+          new CustomEvent('st-masters-hydrated', { detail: { count: locs.length } })
+        );
+      })
+      .catch((e) => console.warn('masters hydrate failed', e));
+  }, []);
 
   function startDoc(type: 'purchase' | 'sale' | 'transfer') {
     setOpsOpen(false);
