@@ -1,13 +1,4 @@
-export type ProductField =
-  | 'sku'
-  | 'barcode'
-  | 'customId'
-  | 'name'
-  | 'category'
-  | 'location'
-  | 'notes';
-
-export interface Product {
+export type Product = {
   id: string;
   name: string;
   sku: string;
@@ -16,46 +7,40 @@ export interface Product {
   category?: string;
   location?: string;
   quantity: number;
-  reorderPoint: number;
+  reorderPoint?: number;
   notes?: string;
   imageUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-  /** Original backend id when client remapped duplicates to SKU */
+  /** Original GAS / sheet id when client id was normalized */
   sourceId?: string;
-}
+  createdAt?: string;
+  updatedAt?: string;
+};
 
-export interface StockMovement {
+export type StockMovement = {
   id: string;
   productId: string;
   change: number;
   reason?: string;
   createdAt: string;
-}
-
-export type QRMappingConfig = {
-  primaryLookupField: ProductField;
-  fillFields: ProductField[];
-  payloadParser: 'plain' | 'json';
 };
 
-export const DEFAULT_QR_MAPPING: QRMappingConfig = {
-  primaryLookupField: 'sku',
-  fillFields: ['sku', 'barcode'],
-  payloadParser: 'json',
-};
+export const PRODUCT_FIELDS = [
+  'id',
+  'name',
+  'sku',
+  'barcode',
+  'customId',
+  'category',
+  'location',
+  'quantity',
+  'reorderPoint',
+  'notes',
+  'imageUrl',
+] as const;
 
-export const PRODUCT_FIELD_LABELS: Record<ProductField, string> = {
-  sku: 'SKU',
-  barcode: 'Barcode',
-  customId: 'Custom ID',
-  name: 'Name',
-  category: 'Category',
-  location: 'Location',
-  notes: 'Notes',
-};
+export type ProductField = (typeof PRODUCT_FIELDS)[number];
 
-export const ALL_PRODUCT_FIELDS: ProductField[] = [
+export const QR_FILLABLE_FIELDS: ProductField[] = [
   'sku',
   'barcode',
   'customId',
@@ -76,6 +61,8 @@ export interface Location {
   gridCol?: number;
   /** Shelf level within cell (1 = bottom/first, 2 = second, …) */
   shelf?: number;
+  /** Max total units allowed at this location (bin capacity). Empty = unlimited */
+  maxQty?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -115,6 +102,8 @@ export interface BusinessPartner {
 export interface LocationProduct {
   locationId: string;
   productId: string;
+  /** Relative space factor for one unit of this product at the location (default 1) */
+  weightage?: number;
 }
 
 export interface PartnerProduct {
@@ -146,15 +135,14 @@ export type DocumentStatus = 'draft' | 'posted' | 'reversed';
 export interface InventoryDocument {
   id: string;
   type: DocumentType;
-  partnerId?: string;
   status: DocumentStatus;
+  partnerId?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
   postedAt?: string;
   reversedAt?: string;
-  reversesDocumentId?: string;
-  reversedByDocumentId?: string;
+  reversedFromId?: string;
 }
 
 export interface DocumentLine {
@@ -166,15 +154,11 @@ export interface DocumentLine {
   fromLocationId?: string;
   toLocationId?: string;
   notes?: string;
-  /** ISO date YYYY-MM-DD */
   purchaseDate?: string;
-  /** ISO date YYYY-MM-DD */
   mfgDate?: string;
-  /** ISO date YYYY-MM-DD */
   expiryDate?: string;
 }
 
-/** Sentinel for transfer from no location (unlocated stock) */
 export const UNLOCATED_LOCATION_ID = '__unlocated__';
 
 export interface StockBatch {
@@ -186,10 +170,7 @@ export interface StockBatch {
   receivedAt: string;
   documentId?: string;
   documentLineId?: string;
-  /** ISO date YYYY-MM-DD */
   purchaseDate?: string;
-  /** ISO date YYYY-MM-DD */
   mfgDate?: string;
-  /** ISO date YYYY-MM-DD */
   expiryDate?: string;
 }
