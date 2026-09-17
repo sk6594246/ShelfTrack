@@ -110,20 +110,20 @@ export function ReceiveDock() {
         onSubmit={handleReceive}
         className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       >
-        {error && (
+        {error ? (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {error}
           </div>
-        )}
+        ) : null}
 
         <label className="block">
-          <span className="text-xs font-semibold text-slate-500">Supplier (optional)</span>
+          <span className="text-xs font-semibold text-slate-500">Supplier</span>
           <select
             value={partnerId}
             onChange={(e) => setPartnerId(e.target.value)}
             className="mt-1 w-full appearance-auto rounded-xl border border-slate-200 px-3 py-3 text-base"
           >
-            <option value="">- None -</option>
+            <option value="">Optional</option>
             {partners.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -143,8 +143,7 @@ export function ReceiveDock() {
             <option value="">Select product...</option>
             {products.map((p: Product) => (
               <option key={p.id} value={p.id}>
-                {p.name}
-                {p.sku ? ` (${p.sku})` : ''}
+                {p.name} ({p.sku}) - stock {p.quantity}
               </option>
             ))}
           </select>
@@ -163,7 +162,9 @@ export function ReceiveDock() {
 
         <div className="grid grid-cols-3 gap-2">
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase text-slate-400">Purchase</span>
+            <span className="text-[10px] font-semibold uppercase text-slate-400">
+              Purchase
+            </span>
             <input
               type="date"
               value={purchaseDate}
@@ -172,7 +173,9 @@ export function ReceiveDock() {
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase text-slate-400">Mfg</span>
+            <span className="text-[10px] font-semibold uppercase text-slate-400">
+              Mfg
+            </span>
             <input
               type="date"
               value={mfgDate}
@@ -181,7 +184,9 @@ export function ReceiveDock() {
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-semibold uppercase text-slate-400">Expiry</span>
+            <span className="text-[10px] font-semibold uppercase text-slate-400">
+              Expiry
+            </span>
             <input
               type="date"
               value={expiryDate}
@@ -192,7 +197,9 @@ export function ReceiveDock() {
         </div>
 
         <label className="block">
-          <span className="text-xs font-semibold text-slate-500">Put-away location *</span>
+          <span className="text-xs font-semibold text-slate-500">
+            Put-away location *
+          </span>
           <select
             value={locationId}
             onChange={(e) => setLocationId(e.target.value)}
@@ -213,7 +220,7 @@ export function ReceiveDock() {
               </option>
             ))}
           </select>
-          {productId && locations.length === 0 && (
+          {productId && locations.length === 0 ? (
             <p className="mt-1 text-xs text-amber-600">
               Assign this product in{' '}
               <Link to="/masters" className="underline">
@@ -221,7 +228,7 @@ export function ReceiveDock() {
               </Link>
               .
             </p>
-          )}
+          ) : null}
         </label>
 
         <button
