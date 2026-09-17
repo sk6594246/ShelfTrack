@@ -1,4 +1,13 @@
-export type Product = {
+export type ProductField =
+  | 'sku'
+  | 'barcode'
+  | 'customId'
+  | 'name'
+  | 'category'
+  | 'location'
+  | 'notes';
+
+export interface Product {
   id: string;
   name: string;
   sku: string;
@@ -7,40 +16,46 @@ export type Product = {
   category?: string;
   location?: string;
   quantity: number;
-  reorderPoint?: number;
+  reorderPoint: number;
   notes?: string;
   imageUrl?: string;
-  /** Original GAS / sheet id when client id was normalized */
+  /** Original backend / GAS id when client id was normalized from SKU */
   sourceId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type StockMovement = {
+export interface StockMovement {
   id: string;
   productId: string;
   change: number;
   reason?: string;
   createdAt: string;
+}
+
+export type QRMappingConfig = {
+  primaryLookupField: ProductField;
+  fillFields: ProductField[];
+  payloadParser: 'plain' | 'json';
 };
 
-export const PRODUCT_FIELDS = [
-  'id',
-  'name',
-  'sku',
-  'barcode',
-  'customId',
-  'category',
-  'location',
-  'quantity',
-  'reorderPoint',
-  'notes',
-  'imageUrl',
-] as const;
+export const DEFAULT_QR_MAPPING: QRMappingConfig = {
+  primaryLookupField: 'sku',
+  fillFields: ['sku', 'barcode'],
+  payloadParser: 'json',
+};
 
-export type ProductField = (typeof PRODUCT_FIELDS)[number];
+export const PRODUCT_FIELD_LABELS: Record<ProductField, string> = {
+  sku: 'SKU',
+  barcode: 'Barcode',
+  customId: 'Custom ID',
+  name: 'Name',
+  category: 'Category',
+  location: 'Location',
+  notes: 'Notes',
+};
 
-export const QR_FILLABLE_FIELDS: ProductField[] = [
+export const ALL_PRODUCT_FIELDS: ProductField[] = [
   'sku',
   'barcode',
   'customId',
@@ -154,6 +169,7 @@ export interface DocumentLine {
   fromLocationId?: string;
   toLocationId?: string;
   notes?: string;
+  /** ISO date YYYY-MM-DD */
   purchaseDate?: string;
   mfgDate?: string;
   expiryDate?: string;
