@@ -13,6 +13,7 @@ import {
   getLocationById,
   getLocations,
   getProductsForLocation,
+  hydrateMastersFromGas,
 } from '../store/mastersStore';
 import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
 import { getDocuments } from '../store/documentsStore';
@@ -100,7 +101,23 @@ export function Dashboard() {
   });
 
   useEffect(() => {
-    setLocations(getLocations());
+    let cancelled = false;
+    (async () => {
+      try {
+        await hydrateMastersFromGas();
+      } catch {
+        /* local */
+      }
+      if (!cancelled) setLocations(getLocations());
+    })();
+    function onHydrated() {
+      if (!cancelled) setLocations(getLocations());
+    }
+    window.addEventListener('st-masters-hydrated', onHydrated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('st-masters-hydrated', onHydrated);
+    };
   }, [products]);
 
   useEffect(() => {
