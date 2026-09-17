@@ -93,38 +93,51 @@ export async function hydrateMastersFromGas(): Promise<Location[]> {
   return hydrateLocationsFromGas();
 }
 
+/**
+ * Pull Locations + LocationProducts from Google Sheet into localStorage.
+ * When GAS is enabled, failures throw (so Settings / Masters can show the real error).
+ * Typical failure: old Code.gs without getLocations → "Unknown action: getLocations".
+ */
 export async function hydrateLocationsFromGas(): Promise<Location[]> {
   if (!isGasEnabled()) return getLocations();
+
+  const remote = await gasGetLocations();
+  const now = new Date().toISOString();
+  const mapped: Location[] = remote.map((r) => {
+    const fromCsv = parseMapPosition(r.mapPosition);
+    return {
+      id: String(r.id),
+      name: r.name || '',
+      code: r.code || undefined,
+      notes: r.notes || undefined,
+      gridRow: r.gridRow ?? fromCsv.gridRow,
+      gridCol: r.gridCol ?? fromCsv.gridCol,
+      shelf: r.shelf ?? fromCsv.shelf,
+      maxQty: (r as { maxQty?: number }).maxQty,
+      createdAt: r.createdAt || now,
+      updatedAt: r.updatedAt || now,
+    };
+  });
+  saveLocal(LOCATIONS_KEY, mapped);
+
   try {
-    const remote = await gasGetLocations();
-    const now = new Date().toISOString();
-    const mapped: Location[] = remote.map((r) => {
-      const fromCsv = parseMapPosition(r.mapPosition);
-      return {
-        id: r.id,
-        name: r.name || '',
-        code: r.code || undefined,
-        notes: r.notes || undefined,
-        gridRow: r.gridRow ?? fromCsv.gridRow,
-        gridCol: r.gridCol ?? fromCsv.gridCol,
-        shelf: r.shelf ?? fromCsv.shelf,
-        maxQty: (r as { maxQty?: number }).maxQty,
-        createdAt: r.createdAt || now,
-        updatedAt: r.updatedAt || now,
-      };
-    });
-    saveLocal(LOCATIONS_KEY, mapped);
-    try {
-      const links = await gasGetLocationProducts();
-      saveLocal(LOCATION_PRODUCTS_KEY, links);
-    } catch {
-      /* links optional */
-    }
-    return mapped.sort((a, b) => a.name.localeCompare(b.name));
+    const links = await gasGetLocationProducts();
+    saveLocal(
+      LOCATION_PRODUCTS_KEY,
+      links.map((l) => ({
+        locationId: String(l.locationId),
+        productId: String(l.productId),
+        weightage:
+          l.weightage != null && Number(l.weightage) > 0
+            ? Number(l.weightage)
+            : undefined,
+      }))
+    );
   } catch (e) {
-    console.warn('hydrateLocationsFromGas failed', e);
-    return getLocations();
+    console.warn('getLocationProducts failed (locations still loaded)', e);
   }
+
+  return mapped.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function saveLocation(
@@ -155,9 +168,6 @@ export function saveLocation(
     };
     list[idx] = updated;
     saveLocal(LOCATIONS_KEY, list);
-    void pushLocationToGas_(updated).then((r) => {
-      if (!r.ok) console.warn('location sheet sync:', r.error);
-    });
     return updated;
   }
 
@@ -175,9 +185,6 @@ export function saveLocation(
   };
   list.push(created);
   saveLocal(LOCATIONS_KEY, list);
-  void pushLocationToGas_(created).then((r) => {
-    if (!r.ok) console.warn('location sheet sync:', r.error);
-  });
   return created;
 }
 
@@ -212,7 +219,7 @@ async function pushLocationToGas_(
   }
 }
 
-/** Save location and wait for GAS write when enabled. Throws if GAS is on and write fails. */
+/** Save locally then wait for sheet write. Throws if GAS is on and write fails. */
 export async function saveLocationAndSync(
   data: Omit<Location, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
 ): Promise<Location> {
@@ -220,7 +227,10 @@ export async function saveLocationAndSync(
   if (isGasEnabled()) {
     const result = await pushLocationToGas_(loc);
     if (!result.ok) {
-      throw new Error(result.error || 'Failed to write location to Google Sheet');
+      throw new Error(
+        result.error ||
+          'Failed to write location to Google Sheet. Update Code.gs and redeploy the web app if you see Unknown action.'
+      );
     }
   }
   return loc;
@@ -307,6 +317,21 @@ export function setProductsForLocation(
   }
 }
 
+export async function setProductsForLocationAndSync(
+  locationId: string,
+  productIds: string[],
+  weightageByProduct?: Record<string, number | undefined>
+): Promise<void> {
+  setProductsForLocation(locationId, productIds, weightageByProduct);
+  if (!isGasEnabled()) return;
+  const links = getLocationProductLinks(locationId).map((lp) => ({
+    locationId: lp.locationId,
+    productId: lp.productId,
+    weightage: lp.weightage,
+  }));
+  await gasSetLocationProducts(locationId, productIds, links);
+}
+
 export function getLocationsForProduct(productId: string): string[] {
   return loadLocal<LocationProduct[]>(LOCATION_PRODUCTS_KEY, [])
     .filter((lp) => lp.productId === productId)
@@ -320,6 +345,7 @@ export function getAssignedLocationsForProduct(productId: string): Location[] {
 }
 
 export function seedMastersIfEmpty(): void {
+  if (isGasEnabled()) return;
   if (getLocations().length === 0) {
     saveLocation({ name: 'Shelf A1', code: 'A1', gridRow: 1, gridCol: 1, shelf: 1 });
     saveLocation({ name: 'Shelf A2', code: 'A2', gridRow: 1, gridCol: 2, shelf: 1 });
