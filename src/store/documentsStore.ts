@@ -11,7 +11,9 @@ import {
   issueFromLocation,
   getAvailableQtyAtLocation,
   getUnlocatedQty,
+  getBatches,
 } from './stockBatchStore';
+import { getLocationById } from './mastersStore';
 
 const DOCS_KEY = 'inventory_documents';
 const LINES_KEY = 'inventory_document_lines';
@@ -136,6 +138,37 @@ export function addLine(documentId: string, input: AddLineInput): DocumentLine {
     if (!input.locationId) throw new Error('Location is required');
   }
 
+  if (doc.type === 'sale' && input.locationId) {
+    const available = getAvailableQtyAtLocation(input.productId, input.locationId);
+    const existing = getLines(documentId)
+      .filter((l) => l.productId === input.productId && l.locationId === input.locationId)
+      .reduce((s, l) => s + l.quantity, 0);
+    if (existing + input.quantity > available) {
+      throw new Error(
+        `Only ${available} available at this location (already ${existing} on other lines). Cannot add ${input.quantity}.`
+      );
+    }
+  }
+  if (
+    doc.type === 'transfer' &&
+    input.fromLocationId &&
+    input.fromLocationId !== UNLOCATED_LOCATION_ID
+  ) {
+    const available = getAvailableQtyAtLocation(input.productId, input.fromLocationId);
+    const existing = getLines(documentId)
+      .filter(
+        (l) =>
+          l.productId === input.productId &&
+          l.fromLocationId === input.fromLocationId
+      )
+      .reduce((s, l) => s + l.quantity, 0);
+    if (existing + input.quantity > available) {
+      throw new Error(
+        `Only ${available} available at source location (already ${existing} on other lines). Cannot add ${input.quantity}.`
+      );
+    }
+  }
+
   const line: DocumentLine = {
     id: uuidv4(),
     documentId,
@@ -168,6 +201,12 @@ export function removeLine(lineId: string): void {
   );
 }
 
+function totalUnitsAtLocation(locationId: string): number {
+  return getBatches()
+    .filter((b) => b.locationId === locationId && b.remaining > 0)
+    .reduce((s, b) => s + b.remaining, 0);
+}
+
 function validateLinesForPost(doc: InventoryDocument, lines: DocumentLine[]) {
   if (lines.length === 0) throw new Error('Add at least one line item');
 
@@ -178,6 +217,58 @@ function validateLinesForPost(doc: InventoryDocument, lines: DocumentLine[]) {
       }
     } else if (!line.locationId) {
       throw new Error('Every line must have a location');
+    }
+  }
+
+  if (doc.type === 'sale' || doc.type === 'transfer') {
+    const needed = new Map<
+      string,
+      { productId: string; locationId: string; qty: number }
+    >();
+    for (const line of lines) {
+      const locId =
+        doc.type === 'sale' ? line.locationId! : line.fromLocationId!;
+      if (!locId || locId === UNLOCATED_LOCATION_ID) continue;
+      const key = `${line.productId}::${locId}`;
+      const cur = needed.get(key);
+      if (cur) cur.qty += line.quantity;
+      else
+        needed.set(key, {
+          productId: line.productId,
+          locationId: locId,
+          qty: line.quantity,
+        });
+    }
+    for (const row of needed.values()) {
+      const available = getAvailableQtyAtLocation(
+        row.productId,
+        row.locationId
+      );
+      if (row.qty > available) {
+        throw new Error(
+          `Not enough stock at location for this document: need ${row.qty}, have ${available}. Reduce line quantities (multiple lines for the same product and location are summed).`
+        );
+      }
+    }
+  }
+
+  if (doc.type === 'purchase' || doc.type === 'transfer') {
+    const inbound = new Map<string, number>();
+    for (const line of lines) {
+      const toId =
+        doc.type === 'purchase' ? line.locationId! : line.toLocationId!;
+      if (!toId || toId === UNLOCATED_LOCATION_ID) continue;
+      inbound.set(toId, (inbound.get(toId) || 0) + line.quantity);
+    }
+    for (const [locId, addQty] of inbound) {
+      const loc = getLocationById(locId);
+      if (!loc?.maxQty || loc.maxQty <= 0) continue;
+      const current = totalUnitsAtLocation(locId);
+      if (current + addQty > loc.maxQty) {
+        throw new Error(
+          `Location "${loc.name}" capacity ${loc.maxQty}: have ${current}, adding ${addQty} would exceed max.`
+        );
+      }
     }
   }
 }
@@ -309,7 +400,10 @@ async function validateStockForPost(
           );
         }
       } else {
-        const atLoc = getAvailableQtyAtLocation(product.id, line.fromLocationId!);
+        const atLoc = getAvailableQtyAtLocation(
+          product.id,
+          line.fromLocationId!
+        );
         if (atLoc < line.quantity) {
           throw new Error(
             `Insufficient stock at source for ${product.name}: have ${atLoc}, need ${line.quantity}`
@@ -331,7 +425,6 @@ export async function postDocument(id: string): Promise<InventoryDocument> {
   if (doc.status === 'reversed') throw new Error('Document was reversed');
   if (doc.status !== 'draft') throw new Error('Only drafts can be posted');
 
-  // Sale requires customer; purchase partner optional (receiving dock)
   if (doc.type === 'sale' && !doc.partnerId) {
     throw new Error('Assign a customer before posting');
   }
