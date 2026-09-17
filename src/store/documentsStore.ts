@@ -13,7 +13,7 @@ import {
   getUnlocatedQty,
   getBatches,
 } from './stockBatchStore';
-import { getLocationById } from './mastersStore';
+import { getLocationById, getWeightageForProductAtLocation } from './mastersStore';
 
 const DOCS_KEY = 'inventory_documents';
 const LINES_KEY = 'inventory_document_lines';
@@ -201,10 +201,15 @@ export function removeLine(lineId: string): void {
   );
 }
 
-function totalUnitsAtLocation(locationId: string): number {
+/** Effective space used at location: sum(remaining * weightage) */
+function totalEffectiveSpaceAtLocation(locationId: string): number {
   return getBatches()
     .filter((b) => b.locationId === locationId && b.remaining > 0)
-    .reduce((s, b) => s + b.remaining, 0);
+    .reduce(
+      (s, b) =>
+        s + b.remaining * getWeightageForProductAtLocation(locationId, b.productId),
+      0
+    );
 }
 
 function validateLinesForPost(doc: InventoryDocument, lines: DocumentLine[]) {
@@ -252,25 +257,32 @@ function validateLinesForPost(doc: InventoryDocument, lines: DocumentLine[]) {
     }
   }
 
+  // Capacity check uses weightage: effectiveSpace = qty * weightage
   if (doc.type === 'purchase' || doc.type === 'transfer') {
-    const inbound = new Map<string, number>();
+    const inboundEffective = new Map<string, number>();
     for (const line of lines) {
       const toId =
         doc.type === 'purchase' ? line.locationId! : line.toLocationId!;
       if (!toId || toId === UNLOCATED_LOCATION_ID) continue;
-      inbound.set(toId, (inbound.get(toId) || 0) + line.quantity);
+      const w = getWeightageForProductAtLocation(toId, line.productId);
+      const add = line.quantity * w;
+      inboundEffective.set(toId, (inboundEffective.get(toId) || 0) + add);
     }
-    for (const [locId, addQty] of inbound) {
+    for (const [locId, addEffective] of inboundEffective) {
       const loc = getLocationById(locId);
       if (!loc?.maxQty || loc.maxQty <= 0) continue;
-      const current = totalUnitsAtLocation(locId);
-      if (current + addQty > loc.maxQty) {
+      const current = totalEffectiveSpaceAtLocation(locId);
+      if (current + addEffective > loc.maxQty + 1e-9) {
         throw new Error(
-          `Location "${loc.name}" capacity ${loc.maxQty}: have ${current}, adding ${addQty} would exceed max.`
+          `Location "${loc.name}" capacity ${loc.maxQty}: effective used ${round2(current)}, adding ${round2(addEffective)} would exceed max (weightage applied).`
         );
       }
     }
   }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 async function applyPostEffects(
