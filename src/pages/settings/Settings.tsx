@@ -13,7 +13,8 @@ import {
   type ThemeMode,
 } from '../../store/themeStore';
 import { isGasEnabled, getGasWebAppUrl } from '../../lib/gasApi';
-import { hydrateMastersFromGas } from '../../store/mastersStore';
+import { getLocations } from '../../store/mastersStore';
+import { getProducts } from '../../store/inventoryStore';
 import { toast } from '../../components/ui/Toast';
 
 export function Settings() {
@@ -201,7 +202,7 @@ export function Settings() {
               <p className="mt-0.5 text-xs break-all" style={{ color: 'var(--st-muted)' }}>
                 {gasOn
                   ? gasUrl.slice(0, 48) + (gasUrl.length > 48 ? '…' : '')
-                  : 'Set VITE_GAS_WEB_APP_URL at build time, then redeploy. Without it, locations stay on this device only.'}
+                  : 'Set VITE_GAS_WEB_APP_URL at build time, then redeploy. Without it, data stays on this device only.'}
               </p>
             </div>
           </div>
@@ -212,13 +213,19 @@ export function Settings() {
               onClick={async () => {
                 setSyncing(true);
                 try {
-                  const locs = await hydrateMastersFromGas();
+                  const [locs, products] = await Promise.all([
+                    getLocations(),
+                    getProducts(),
+                  ]);
                   window.dispatchEvent(
                     new CustomEvent('st-masters-hydrated', {
                       detail: { count: locs.length },
                     })
                   );
-                  toast(`Synced ${locs.length} location(s) from sheet`, 'success');
+                  toast(
+                    `Synced ${locs.length} location(s) · ${products.length} product(s) from sheet`,
+                    'success'
+                  );
                 } catch (e) {
                   toast(e instanceof Error ? e.message : 'Sync failed', 'error');
                 } finally {
@@ -229,7 +236,7 @@ export function Settings() {
               style={{ background: 'var(--st-primary)' }}
             >
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Pulling from sheet…' : 'Pull locations from sheet now'}
+              {syncing ? 'Syncing all from sheet…' : 'Sync all from sheet'}
             </button>
           )}
         </div>
