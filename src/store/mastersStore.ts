@@ -90,6 +90,11 @@ export function getLocationById(id: string): Location | undefined {
   return getLocations().find((l) => l.id === id);
 }
 
+/** Pull locations + location-product links from GAS into localStorage (cross-device). */
+export async function hydrateMastersFromGas(): Promise<Location[]> {
+  return hydrateLocationsFromGas();
+}
+
 export async function hydrateLocationsFromGas(): Promise<Location[]> {
   if (!isGasEnabled()) return getLocations();
   try {
