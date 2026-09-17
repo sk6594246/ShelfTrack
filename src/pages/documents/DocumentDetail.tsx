@@ -70,7 +70,9 @@ export function DocumentDetail() {
     reload();
     getProducts().then(setProducts);
     setPartners(getPartners());
-    setAllLocations(getLocations());
+    void getLocations()
+      .then(setAllLocations)
+      .catch(() => setAllLocations([]));
   }, [reload]);
 
   const isDraft = doc?.status === 'draft';
