@@ -559,6 +559,7 @@ export function LocationsPanel() {
         </div>
       </div>
 
+      {/* Build-safe QRPrintModal props: open, payloadJson, kind */}
       {printLoc ? (
         <QRPrintModal
           open={!!printLoc}
