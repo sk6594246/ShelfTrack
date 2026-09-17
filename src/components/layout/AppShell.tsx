@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { CommandPalette } from '../CommandPalette';
-import { ToastHost } from '../ui/Toast';
+import { ToastHost, toast } from '../ui/Toast';
 import { createDocument } from '../../store/documentsStore';
 import { hydrateMastersFromGas } from '../../store/mastersStore';
 import { isGasEnabled } from '../../lib/gasApi';
@@ -41,7 +41,6 @@ export function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false);
   const navigate = useNavigate();
 
-  // Cross-device: pull Locations + LocationProducts from Google Sheet into localStorage
   useEffect(() => {
     if (!isGasEnabled()) return;
     void hydrateMastersFromGas()
@@ -50,7 +49,16 @@ export function AppShell() {
           new CustomEvent('st-masters-hydrated', { detail: { count: locs.length } })
         );
       })
-      .catch((e) => console.warn('masters hydrate failed', e));
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn('masters hydrate failed', e);
+        toast(
+          msg.includes('Unknown action')
+            ? 'Locations API missing in GAS — paste latest Code.gs and redeploy web app'
+            : `Location sync failed: ${msg}`,
+          'error'
+        );
+      });
   }, []);
 
   function startDoc(type: 'purchase' | 'sale' | 'transfer') {
