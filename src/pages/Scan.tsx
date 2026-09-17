@@ -45,7 +45,7 @@ export function Scan() {
 
   useEffect(() => {
     if (!flash) return;
-    const t = window.setTimeout(() => setFlash(false), 450);
+    const t = window.setTimeout(() => setFlash(false), 900);
     return () => window.clearTimeout(t);
   }, [flash]);
 
@@ -106,6 +106,17 @@ export function Scan() {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col p-4 md:p-6">
+      {flash ? (
+        <div
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-emerald-500/25"
+          aria-hidden
+        >
+          <div className="st-enter flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xl">
+            <CheckCircle2 className="h-12 w-12" strokeWidth={2.5} />
+          </div>
+        </div>
+      ) : null}
+
       <header className="mb-5">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
           Scan QR / Barcode
@@ -121,7 +132,7 @@ export function Scan() {
             <span className="absolute right-4 top-4 h-10 w-10 rounded-tr-xl border-r-[3px] border-t-[3px] border-white/80" />
             <span className="absolute bottom-4 left-4 h-10 w-10 rounded-bl-xl border-b-[3px] border-l-[3px] border-white/80" />
             <span className="absolute bottom-4 right-4 h-10 w-10 rounded-br-xl border-b-[3px] border-r-[3px] border-white/80" />
-            <div className="absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent st-scan-line" />
+            <div className="st-scan-line absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-emerald-400/80 to-transparent" />
           </div>
         )}
         {flash && (
@@ -130,20 +141,16 @@ export function Scan() {
       </div>
 
       {(lastResult || message) && (
-        <div className="mb-4 rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm st-enter">
+        <div className="st-enter mb-4 rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
               <div>
-                {message && (
-                  <p className="font-semibold text-slate-900">{message}</p>
-                )}
+                {message && <p className="font-semibold text-slate-900">{message}</p>}
                 {lastResult && (
-                  <p className="mt-1 break-all font-mono text-xs text-slate-500">
-                    {lastResult}
-                  </p>
+                  <p className="mt-1 break-all font-mono text-xs text-slate-500">{lastResult}</p>
                 )}
               </div>
             </div>
@@ -222,8 +229,7 @@ export function Scan() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-slate-900">QR field mapping</p>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-              Configure which fields are used for lookup and pre-fill when a code is
-              scanned.
+              Configure which fields are used for lookup and pre-fill when a code is scanned.
             </p>
             <Link
               to="/settings/qr-mapping"
