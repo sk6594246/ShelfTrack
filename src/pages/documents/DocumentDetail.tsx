@@ -29,7 +29,6 @@ import {
   getAssignedLocationsForProduct,
   getFifoLocationsForProduct,
   getFefoLocationsForProduct,
-  getUnlocatedQty,
 } from '../../store/stockBatchStore';
 import type {
   InventoryDocument,
@@ -85,7 +84,7 @@ export function DocumentDetail() {
   const productOptions = useMemo(() => {
     if (!doc) return products;
     if (doc.partnerId) {
-      const linked = getProductsForPartner(doc.partnerId);
+      const linked = getProductsForPartner(doc.partnerId).map((pp) => pp.productId);
       if (linked.length) {
         return products.filter((p) => linked.includes(p.id));
       }
@@ -194,9 +193,7 @@ export function DocumentDetail() {
 
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">
-            {doc.type}
-          </p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">{doc.type}</p>
           <h1 className="text-2xl font-bold capitalize text-slate-900">{doc.type} document</h1>
           <p className="mt-1 font-mono text-[11px] text-slate-400">{doc.id}</p>
           <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-600">
@@ -205,20 +202,11 @@ export function DocumentDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           {doc.status === 'posted' && (
-            <button
-              type="button"
-              onClick={handleReverse}
-              disabled={busy}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-            >
+            <button type="button" onClick={handleReverse} disabled={busy} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
               <Undo2 className="h-3.5 w-3.5" /> Reverse
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-          >
+          <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
             <Printer className="h-3.5 w-3.5" /> Print
           </button>
           {isDraft && (
@@ -254,9 +242,7 @@ export function DocumentDetail() {
             >
               <option value="">— Select —</option>
               {partnerOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </label>
@@ -280,19 +266,11 @@ export function DocumentDetail() {
                     <div className="min-w-0">
                       <p className="font-medium text-slate-900">{prod?.name || line.productId}</p>
                       <p className="text-xs text-slate-400">
-                        qty {line.quantity}
-                        {loc ? ` · ${loc.name}` : ''}
+                        qty {line.quantity}{loc ? ` · ${loc.name}` : ''}
                       </p>
                     </div>
                     {isDraft && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          removeLine(line.id);
-                          reload();
-                        }}
-                        className="text-rose-500"
-                      >
+                      <button type="button" onClick={() => { removeLine(line.id); reload(); }} className="text-rose-500">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -306,66 +284,40 @@ export function DocumentDetail() {
         {isDraft && (
           <form onSubmit={handleAddLine} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Add line</p>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              required
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-            >
+            <select value={productId} onChange={(e) => setProductId(e.target.value)} required className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
               <option value="">Product…</option>
               {productOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.sku})
-                </option>
+                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
               ))}
             </select>
 
             {doc.type === 'transfer' ? (
               <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={fromLocationId}
-                  onChange={(e) => setFromLocationId(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
+                <select value={fromLocationId} onChange={(e) => setFromLocationId(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
                   <option value="">From (no location)</option>
                   {allLocations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
+                    <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </select>
-                <select
-                  value={toLocationId}
-                  onChange={(e) => setToLocationId(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
+                <select value={toLocationId} onChange={(e) => setToLocationId(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
                   <option value="">To location…</option>
                   {allLocations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
+                    <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </select>
               </div>
             ) : (
-              <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-              >
+              <select value={locationId} onChange={(e) => setLocationId(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
                 <option value="">Location…</option>
                 {locationOptions.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                    {l.code ? ` (${l.code})` : ''}
-                  </option>
+                  <option key={l.id} value={l.id}>{l.name}{l.code ? ` (${l.code})` : ''}</option>
                 ))}
               </select>
             )}
 
             {doc.type === 'purchase' && (
               <div className="grid grid-cols-3 gap-2">
-                <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" placeholder="Purchase" />
+                <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
                 <input type="date" value={mfgDate} onChange={(e) => setMfgDate(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
                 <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
               </div>
@@ -393,22 +345,14 @@ export function DocumentDetail() {
         )}
 
         {isDraft && (doc.type === 'sale' || doc.type === 'transfer') && lines.length > 0 && (
-          <Link
-            to={`/pick?doc=${doc.id}`}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700"
-          >
+          <Link to={`/pick?doc=${doc.id}`} className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700">
             Open pick list (walk path)
           </Link>
         )}
 
         {isDraft && (
           <div className="st-safe-bottom sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 py-3 backdrop-blur">
-            <button
-              type="button"
-              onClick={handlePost}
-              disabled={busy || lines.length === 0}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-60"
-            >
+            <button type="button" onClick={handlePost} disabled={busy || lines.length === 0} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-semibold text-white disabled:opacity-60">
               <CheckCircle2 className="h-4 w-4" /> {busy ? 'Posting…' : 'Post document'}
             </button>
           </div>
