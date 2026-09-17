@@ -28,7 +28,9 @@ export function LocationsPanel() {
   const [shelf, setShelf] = useState('1');
   const [maxQty, setMaxQty] = useState('');
   const [assignedIds, setAssignedIds] = useState<string[]>([]);
-  const [weightageByProduct, setWeightageByProduct] = useState<Record<string, number>>({});
+  const [weightageByProduct, setWeightageByProduct] = useState<
+    Record<string, number>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [printLoc, setPrintLoc] = useState<Location | null>(null);
   const [query, setQuery] = useState('');
@@ -377,9 +379,7 @@ export function LocationsPanel() {
                   </p>
                   <div className="grid grid-cols-3 gap-2">
                     <label className="block">
-                      <span className="text-xs font-semibold text-slate-500">
-                        Grid row
-                      </span>
+                      <span className="text-xs font-semibold text-slate-500">Grid row</span>
                       <input
                         type="number"
                         min={1}
@@ -391,9 +391,7 @@ export function LocationsPanel() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-xs font-semibold text-slate-500">
-                        Grid col
-                      </span>
+                      <span className="text-xs font-semibold text-slate-500">Grid col</span>
                       <input
                         type="number"
                         min={1}
@@ -405,9 +403,7 @@ export function LocationsPanel() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-xs font-semibold text-slate-500">
-                        Shelf #
-                      </span>
+                      <span className="text-xs font-semibold text-slate-500">Shelf #</span>
                       <input
                         type="number"
                         min={1}
@@ -420,8 +416,7 @@ export function LocationsPanel() {
                     </label>
                   </div>
                   <p className="mt-2 text-[11px] text-slate-500">
-                    Example: row 1, col 1, shelf 2 = 2nd shelf in cell R1C1.
-                    Leave row/col empty to keep off the map.
+                    Example: row 1, col 1, shelf 2 = 2nd shelf in cell R1C1. Leave row/col empty to keep off the map.
                   </p>
                   <p className="mt-2 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-indigo-800 ring-1 ring-indigo-100">
                     Preview:{' '}
@@ -460,9 +455,7 @@ export function LocationsPanel() {
                   />
                 </label>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500">
-                    Storable products
-                  </span>
+                  <span className="text-xs font-semibold text-slate-500">Storable products</span>
                   <p className="mt-0.5 text-[11px] text-slate-400">
                     Weightage (w) = space multiplier. Default 1. Example: 0.5 → 50 qty uses 25 capacity.
                   </p>
@@ -496,9 +489,7 @@ export function LocationsPanel() {
                                 className="min-w-0 flex-1 cursor-pointer truncate"
                               >
                                 {p.name}{' '}
-                                <span className="text-xs text-slate-400">
-                                  ({p.sku})
-                                </span>
+                                <span className="text-xs text-slate-400">({p.sku})</span>
                               </label>
                               {isChecked ? (
                                 <label className="flex shrink-0 items-center gap-1 text-[11px] text-slate-500">
@@ -570,9 +561,12 @@ export function LocationsPanel() {
 
       {printLoc ? (
         <QRPrintModal
-          title={`Location QR · ${printLoc.name}`}
-          payload={payloadToJson(buildLocationQRPayload(printLoc))}
+          open={!!printLoc}
           onClose={() => setPrintLoc(null)}
+          payloadJson={payloadToJson(buildLocationQRPayload(printLoc))}
+          title={printLoc.name}
+          subtitle={printLoc.code}
+          kind="Location"
         />
       ) : null}
     </div>
