@@ -30,7 +30,7 @@ var PRODUCT_HEADERS = [
 var MOVEMENT_HEADERS = ['id', 'productId', 'change', 'reason', 'createdAt'];
 
 var LOCATION_HEADERS = [
-  'id', 'name', 'code', 'mapPosition', 'notes', 'createdAt', 'updatedAt'
+  'id', 'name', 'code', 'mapPosition', 'maxQty', 'notes', 'createdAt', 'updatedAt'
 ];
 
 var LOCATION_PRODUCT_HEADERS = ['locationId', 'productId'];
@@ -110,10 +110,6 @@ function jsonResponse_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/**
- * Run once from the Apps Script editor to create/upgrade sheets + headers.
- * Safe to re-run: adds missing sheets/headers without wiping data.
- */
 function initializeSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -226,6 +222,7 @@ function getAllLocations_() {
       gridCol: pos.gridCol || undefined,
       shelf: pos.shelf || undefined,
       mapPosition: obj.mapPosition ? String(obj.mapPosition) : '',
+      maxQty: obj.maxQty !== '' && obj.maxQty != null ? Number(obj.maxQty) : undefined,
       createdAt: obj.createdAt ? String(obj.createdAt) : '',
       updatedAt: obj.updatedAt ? String(obj.updatedAt) : '',
     });
@@ -266,6 +263,7 @@ function saveLocation_(incoming) {
     name: incoming.name || '',
     code: incoming.code || '',
     mapPosition: mapPos || '',
+    maxQty: incoming.maxQty != null && incoming.maxQty !== '' ? Number(incoming.maxQty) : '',
     notes: incoming.notes || '',
     gridRow: parsed.gridRow || undefined,
     gridCol: parsed.gridCol || undefined,
@@ -292,6 +290,7 @@ function saveLocation_(incoming) {
 function locationToRow_(headers, loc) {
   return headers.map(function (h) {
     if (h === 'mapPosition') return loc.mapPosition || formatMapPosition_(loc) || '';
+    if (h === 'maxQty') return loc.maxQty != null && loc.maxQty !== '' ? loc.maxQty : '';
     var v = loc[h];
     return v === undefined || v === null ? '' : v;
   });
