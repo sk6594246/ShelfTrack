@@ -11,6 +11,11 @@ export function isGasEnabled(): boolean {
   return Boolean(GAS_URL && GAS_URL.startsWith('http'));
 }
 
+/** Build-time URL (empty if not configured). Safe to show truncated in UI. */
+export function getGasWebAppUrl(): string {
+  return GAS_URL && GAS_URL.startsWith('http') ? GAS_URL : '';
+}
+
 async function gasRequest<T>(
   action: string,
   payload: Record<string, unknown> = {}
