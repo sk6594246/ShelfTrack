@@ -25,6 +25,7 @@ export function LocationsPanel() {
   const [gridRow, setGridRow] = useState('');
   const [gridCol, setGridCol] = useState('');
   const [shelf, setShelf] = useState('1');
+  const [maxQty, setMaxQty] = useState('');
   const [assignedIds, setAssignedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [printLoc, setPrintLoc] = useState<Location | null>(null);
@@ -63,6 +64,7 @@ export function LocationsPanel() {
     setGridRow('');
     setGridCol('');
     setShelf('1');
+    setMaxQty('');
     setAssignedIds([]);
     setError(null);
   }
@@ -76,6 +78,7 @@ export function LocationsPanel() {
     setGridRow(loc.gridRow != null ? String(loc.gridRow) : '');
     setGridCol(loc.gridCol != null ? String(loc.gridCol) : '');
     setShelf(loc.shelf != null ? String(loc.shelf) : '1');
+    setMaxQty(loc.maxQty != null ? String(loc.maxQty) : '');
     setAssignedIds(getProductsForLocation(loc.id));
     setError(null);
   }
@@ -112,6 +115,8 @@ export function LocationsPanel() {
       const nextRow = parseGrid(gridRow);
       const nextCol = parseGrid(gridCol);
       const nextShelf = parseGrid(shelf);
+      const nextMax =
+        maxQty.trim() && Number(maxQty) > 0 ? Number(maxQty) : undefined;
       const saved = saveLocation({
         id: editing?.id,
         name,
@@ -120,6 +125,7 @@ export function LocationsPanel() {
         gridRow: nextRow,
         gridCol: nextCol,
         shelf: nextShelf,
+        maxQty: nextMax,
       });
       setProductsForLocation(saved.id, assignedIds);
       const cell =
@@ -137,6 +143,7 @@ export function LocationsPanel() {
       setGridRow(saved.gridRow != null ? String(saved.gridRow) : '');
       setGridCol(saved.gridCol != null ? String(saved.gridCol) : '');
       setShelf(saved.shelf != null ? String(saved.shelf) : '1');
+      setMaxQty(saved.maxQty != null ? String(saved.maxQty) : '');
       reload();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -268,7 +275,9 @@ export function LocationsPanel() {
                           <p className="truncate text-[11px] text-slate-400">
                             {cell}
                             {loc.shelf ? ` · S${loc.shelf}` : ''}
-                            {loc.code ? ` · ${loc.code}` : ''} · {count} prod
+                            {loc.code ? ` · ${loc.code}` : ''}
+                            {loc.maxQty != null ? ` · max ${loc.maxQty}` : ''} ·{' '}
+                            {count} prod
                           </p>
                         </div>
                       </button>
@@ -392,6 +401,24 @@ export function LocationsPanel() {
                       : 'off-grid (set row + col, then Save)'}
                   </p>
                 </div>
+
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Max qty (location capacity)
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={maxQty}
+                    onChange={(e) => setMaxQty(e.target.value)}
+                    placeholder="Unlimited if empty"
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Total units allowed at this bin. Receive/transfer-in blocked when
+                    exceeded.
+                  </p>
+                </label>
 
                 <label className="block">
                   <span className="text-xs font-semibold text-slate-500">Notes</span>
