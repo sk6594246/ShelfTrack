@@ -232,6 +232,17 @@ export function getLocationProductLink(
   return getLocationProductLinks(locationId).find((lp) => lp.productId === productId);
 }
 
+/** Space multiplier for product at location (default 1). effectiveSpace = qty * weightage */
+export function getWeightageForProductAtLocation(
+  locationId: string,
+  productId: string
+): number {
+  const link = getLocationProductLink(locationId, productId);
+  const w = link?.weightage;
+  if (w != null && Number.isFinite(Number(w)) && Number(w) > 0) return Number(w);
+  return 1;
+}
+
 export function setProductsForLocation(
   locationId: string,
   productIds: string[],
@@ -253,7 +264,14 @@ export function setProductsForLocation(
   ];
   saveLocal(LOCATION_PRODUCTS_KEY, next);
   if (isGasEnabled()) {
-    void gasSetLocationProducts(locationId, productIds).catch((e) =>
+    const links = next
+      .filter((lp) => lp.locationId === locationId)
+      .map((lp) => ({
+        locationId: lp.locationId,
+        productId: lp.productId,
+        weightage: lp.weightage,
+      }));
+    void gasSetLocationProducts(locationId, productIds, links).catch((e) =>
       console.warn('gasSetLocationProducts failed', e)
     );
   }
