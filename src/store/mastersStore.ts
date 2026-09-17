@@ -47,7 +47,6 @@ function optionalPositive(n: number | undefined | null): number | undefined {
   return v > 0 ? v : undefined;
 }
 
-/** Serialize grid for Sheets: "row,col,shelf" */
 export function formatMapPosition(loc: {
   gridRow?: number;
   gridCol?: number;
@@ -90,7 +89,6 @@ export function getLocationById(id: string): Location | undefined {
   return getLocations().find((l) => l.id === id);
 }
 
-/** Pull locations + location-product links from GAS into localStorage (cross-device). */
 export async function hydrateMastersFromGas(): Promise<Location[]> {
   return hydrateLocationsFromGas();
 }
@@ -157,7 +155,9 @@ export function saveLocation(
     };
     list[idx] = updated;
     saveLocal(LOCATIONS_KEY, list);
-    void pushLocationToGas_(updated);
+    void pushLocationToGas_(updated).then((r) => {
+      if (!r.ok) console.warn('location sheet sync:', r.error);
+    });
     return updated;
   }
 
@@ -175,12 +175,21 @@ export function saveLocation(
   };
   list.push(created);
   saveLocal(LOCATIONS_KEY, list);
-  void pushLocationToGas_(created);
+  void pushLocationToGas_(created).then((r) => {
+    if (!r.ok) console.warn('location sheet sync:', r.error);
+  });
   return created;
 }
 
-async function pushLocationToGas_(loc: Location): Promise<void> {
-  if (!isGasEnabled()) return;
+async function pushLocationToGas_(
+  loc: Location
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isGasEnabled()) {
+    return {
+      ok: false,
+      error: 'GAS not configured (VITE_GAS_WEB_APP_URL missing at build)',
+    };
+  }
   try {
     await gasSaveLocation({
       id: loc.id,
@@ -195,9 +204,26 @@ async function pushLocationToGas_(loc: Location): Promise<void> {
       createdAt: loc.createdAt,
       updatedAt: loc.updatedAt,
     });
+    return { ok: true };
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.warn('gasSaveLocation failed', e);
+    return { ok: false, error: msg };
   }
+}
+
+/** Save location and wait for GAS write when enabled. Throws if GAS is on and write fails. */
+export async function saveLocationAndSync(
+  data: Omit<Location, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+): Promise<Location> {
+  const loc = saveLocation(data);
+  if (isGasEnabled()) {
+    const result = await pushLocationToGas_(loc);
+    if (!result.ok) {
+      throw new Error(result.error || 'Failed to write location to Google Sheet');
+    }
+  }
+  return loc;
 }
 
 export function deleteLocation(id: string): void {
@@ -237,7 +263,6 @@ export function getLocationProductLink(
   return getLocationProductLinks(locationId).find((lp) => lp.productId === productId);
 }
 
-/** Space multiplier for product at location (default 1). effectiveSpace = qty * weightage */
 export function getWeightageForProductAtLocation(
   locationId: string,
   productId: string
