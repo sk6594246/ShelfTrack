@@ -157,6 +157,11 @@ export interface InventoryDocument {
   updatedAt: string;
   postedAt?: string;
   reversedAt?: string;
+  /** This doc reverses another (set on the reversal record) */
+  reversesDocumentId?: string;
+  /** Id of the document that reversed this one (set on the original) */
+  reversedByDocumentId?: string;
+  /** @deprecated use reversesDocumentId */
   reversedFromId?: string;
 }
 
