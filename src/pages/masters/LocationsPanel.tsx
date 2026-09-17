@@ -37,8 +37,14 @@ export function LocationsPanel() {
   const [layoutRows, setLayoutRows] = useState(() => getStoreLayout().rows);
   const [layoutCols, setLayoutCols] = useState(() => getStoreLayout().cols);
 
-  const reload = useCallback(() => {
-    setList(getLocations());
+  const reload = useCallback(async () => {
+    try {
+      const locs = await getLocations();
+      setList(locs);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to load locations', 'error');
+      setList([]);
+    }
     getProducts().then(setProducts);
     const layout = getStoreLayout();
     setLayoutRows(layout.rows);
@@ -112,7 +118,7 @@ export function LocationsPanel() {
     toast(`Layout set to ${next.rows}x${next.cols}`, 'success');
   }
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
       setError('Name is required');
@@ -130,7 +136,7 @@ export function LocationsPanel() {
       const nextShelf = parseGrid(shelf);
       const nextMax =
         maxQty.trim() && Number(maxQty) > 0 ? Number(maxQty) : undefined;
-      const saved = saveLocation({
+      const saved = await saveLocation({
         id: editing?.id,
         name,
         code: code || undefined,
@@ -140,7 +146,7 @@ export function LocationsPanel() {
         shelf: nextShelf,
         maxQty: nextMax,
       });
-      setProductsForLocation(saved.id, assignedIds, weightageByProduct);
+      await setProductsForLocation(saved.id, assignedIds, weightageByProduct);
       const cell =
         saved.gridRow != null && saved.gridCol != null
           ? `R${saved.gridRow}C${saved.gridCol}`
@@ -157,18 +163,22 @@ export function LocationsPanel() {
       setGridCol(saved.gridCol != null ? String(saved.gridCol) : '');
       setShelf(saved.shelf != null ? String(saved.shelf) : '1');
       setMaxQty(saved.maxQty != null ? String(saved.maxQty) : '');
-      reload();
+      await reload();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     }
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (!window.confirm('Delete this location and its product assignments?')) return;
-    deleteLocation(id);
-    toast('Location deleted', 'info');
-    closeForm();
-    reload();
+    try {
+      await deleteLocation(id);
+      toast('Location deleted', 'info');
+      closeForm();
+      await reload();
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Delete failed', 'error');
+    }
   }
 
   function toggleProduct(pid: string, checked: boolean) {
