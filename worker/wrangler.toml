@@ -1,0 +1,9 @@
+name = "shelftrack"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shelftrack"
+# Replace with your D1 database_id from Cloudflare dashboard if deploy fails
+# database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
