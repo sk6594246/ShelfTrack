@@ -12,8 +12,14 @@ import {
   setThemeMode,
   type ThemeMode,
 } from '../../store/themeStore';
-import { isGasEnabled, getGasWebAppUrl } from '../../lib/gasApi';
-import { getLocations } from '../../store/mastersStore';
+import {
+  isGasEnabled,
+  isD1Enabled,
+  getBackendUrl,
+  getGasWebAppUrl,
+  ensureTenant,
+} from '../../lib/gasApi';
+import { getLocations, getCategories, getPartners } from '../../store/mastersStore';
 import { getProducts } from '../../store/inventoryStore';
 import { toast } from '../../components/ui/Toast';
 
@@ -176,7 +182,7 @@ export function Settings() {
           className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider"
           style={{ color: 'var(--st-muted)' }}
         >
-          Google Sheet sync
+          Cloud sync
         </p>
         <div
           className="space-y-3 overflow-hidden rounded-2xl border p-4 shadow-sm"
@@ -197,12 +203,16 @@ export function Settings() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold" style={{ color: 'var(--st-text)' }}>
-                {gasOn ? 'GAS connected' : 'GAS not configured'}
+                {gasOn
+                  ? isD1Enabled()
+                    ? 'D1 API connected'
+                    : 'GAS connected'
+                  : 'Backend not configured'}
               </p>
               <p className="mt-0.5 text-xs break-all" style={{ color: 'var(--st-muted)' }}>
                 {gasOn
                   ? gasUrl.slice(0, 48) + (gasUrl.length > 48 ? '…' : '')
-                  : 'Set VITE_GAS_WEB_APP_URL at build time, then redeploy. Without it, data stays on this device only.'}
+                  : 'Set VITE_D1_API_URL (or VITE_GAS_WEB_APP_URL) at build time, then redeploy. Without it, data stays on this device only.'}
               </p>
             </div>
           </div>
@@ -213,9 +223,14 @@ export function Settings() {
               onClick={async () => {
                 setSyncing(true);
                 try {
-                  const [locs, products] = await Promise.all([
+                  if (isD1Enabled()) {
+                    await ensureTenant();
+                  }
+                  const [locs, products, cats, partners] = await Promise.all([
                     getLocations(),
                     getProducts(),
+                    getCategories(),
+                    getPartners(),
                   ]);
                   window.dispatchEvent(
                     new CustomEvent('st-masters-hydrated', {
@@ -223,7 +238,7 @@ export function Settings() {
                     })
                   );
                   toast(
-                    `Synced ${locs.length} location(s) · ${products.length} product(s) from sheet`,
+                    `Synced ${locs.length} loc · ${products.length} prod · ${cats.length} cat · ${partners.length} partner(s)`,
                     'success'
                   );
                 } catch (e) {
@@ -236,7 +251,7 @@ export function Settings() {
               style={{ background: 'var(--st-primary)' }}
             >
               <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing all from sheet…' : 'Sync all from sheet'}
+              {syncing ? 'Syncing all from cloud…' : 'Sync all from cloud'}
             </button>
           )}
         </div>
