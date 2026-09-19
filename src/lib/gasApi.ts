@@ -1,27 +1,85 @@
 /**
- * Google Apps Script (GAS) API client
- * Talks to a deployed Web App that uses Google Sheets as the database.
+ * ShelfTrack backend API client
  *
- * Set VITE_GAS_WEB_APP_URL in .env (or fall back to empty = use localStorage only)
+ * Prefer Cloudflare D1 Worker when VITE_D1_API_URL is set.
+ * Fall back to Google Apps Script when VITE_GAS_WEB_APP_URL is set.
+ * If neither is set, callers should use localStorage only.
+ *
+ * D1 Worker: POST { action, tenantId?, ...payload }
+ * Default tenant: "default" (auto-created by Worker).
  */
 
+const D1_URL = import.meta.env.VITE_D1_API_URL as string | undefined;
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL as string | undefined;
 
+const DEFAULT_TENANT_ID = 'default';
+const TENANT_KEY = 'shelftrack_tenant_id';
+
+export function isD1Enabled(): boolean {
+  return Boolean(D1_URL && D1_URL.startsWith('http'));
+}
+
 export function isGasEnabled(): boolean {
+  // Prefer D1 when both are configured
+  if (isD1Enabled()) return true;
   return Boolean(GAS_URL && GAS_URL.startsWith('http'));
 }
 
-/** Build-time URL (empty if not configured). Safe to show truncated in UI. */
-export function getGasWebAppUrl(): string {
-  return GAS_URL && GAS_URL.startsWith('http') ? GAS_URL : '';
+export function getBackendUrl(): string {
+  if (isD1Enabled()) return D1_URL!;
+  if (GAS_URL && GAS_URL.startsWith('http')) return GAS_URL;
+  return '';
 }
 
-async function gasRequest<T>(
+/** @deprecated use getBackendUrl — kept for Settings UI compatibility */
+export function getGasWebAppUrl(): string {
+  return getBackendUrl();
+}
+
+export function getTenantId(): string {
+  try {
+    const stored = localStorage.getItem(TENANT_KEY);
+    if (stored && stored.trim()) return stored.trim();
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_TENANT_ID;
+}
+
+export function setTenantId(id: string): void {
+  try {
+    localStorage.setItem(TENANT_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function backendRequest<T>(
   action: string,
   payload: Record<string, unknown> = {}
 ): Promise<T> {
+  if (isD1Enabled()) {
+    const res = await fetch(D1_URL!, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        tenantId: getTenantId(),
+        ...payload,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`D1 API failed: ${res.status} ${res.statusText}`);
+    }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data as T;
+  }
+
   if (!GAS_URL) {
-    throw new Error('GAS Web App URL is not configured (VITE_GAS_WEB_APP_URL)');
+    throw new Error(
+      'No backend configured. Set VITE_D1_API_URL or VITE_GAS_WEB_APP_URL.'
+    );
   }
 
   const res = await fetch(GAS_URL, {
@@ -36,35 +94,45 @@ async function gasRequest<T>(
   }
 
   const data = await res.json();
-  if (data.error) {
-    throw new Error(data.error);
-  }
+  if (data.error) throw new Error(data.error);
   return data as T;
+}
+
+/** Ensure default tenant exists on D1 (no-op for GAS). */
+export async function ensureTenant(): Promise<string> {
+  if (!isD1Enabled()) return getTenantId();
+  const data = await backendRequest<{ tenantId?: string }>('ensureTenant');
+  if (data.tenantId) setTenantId(data.tenantId);
+  return getTenantId();
 }
 
 // ---------- Products ----------
 export async function gasGetProducts() {
-  const data = await gasRequest<{ products: any[] }>('getProducts');
+  const data = await backendRequest<{ products: any[] }>('getProducts');
   return data.products ?? [];
 }
 
 export async function gasGetProduct(id: string) {
-  const data = await gasRequest<{ product: any | null }>('getProduct', { id });
+  const data = await backendRequest<{ product: any | null }>('getProduct', {
+    id,
+  });
   return data.product ?? null;
 }
 
 export async function gasSaveProduct(product: Record<string, unknown>) {
-  const data = await gasRequest<{ product: any }>('saveProduct', { product });
+  const data = await backendRequest<{ product: any }>('saveProduct', {
+    product,
+  });
   return data.product;
 }
 
 export async function gasDeleteProduct(id: string) {
-  await gasRequest('deleteProduct', { id });
+  await backendRequest('deleteProduct', { id });
 }
 
 // ---------- Stock movements ----------
 export async function gasGetMovements(productId?: string) {
-  const data = await gasRequest<{ movements: any[] }>('getMovements', {
+  const data = await backendRequest<{ movements: any[] }>('getMovements', {
     productId: productId ?? null,
   });
   return data.movements ?? [];
@@ -76,7 +144,7 @@ export async function gasAdjustStock(
   reason?: string,
   sku?: string
 ) {
-  const data = await gasRequest<{ product: any }>('adjustStock', {
+  const data = await backendRequest<{ product: any }>('adjustStock', {
     productId,
     change,
     reason: reason ?? '',
@@ -87,15 +155,15 @@ export async function gasAdjustStock(
 
 // ---------- QR Mapping ----------
 export async function gasGetQRMapping() {
-  const data = await gasRequest<{ config: any }>('getQRMapping');
+  const data = await backendRequest<{ config: any }>('getQRMapping');
   return data.config;
 }
 
 export async function gasSaveQRMapping(config: Record<string, unknown>) {
-  await gasRequest('saveQRMapping', { config });
+  await backendRequest('saveQRMapping', { config });
 }
 
-// ---------- Locations (mapPosition = "row,col,shelf") ----------
+// ---------- Locations ----------
 export type GasLocation = {
   id: string;
   name: string;
@@ -111,21 +179,23 @@ export type GasLocation = {
 };
 
 export async function gasGetLocations(): Promise<GasLocation[]> {
-  const data = await gasRequest<{ locations: GasLocation[] }>('getLocations');
+  const data = await backendRequest<{ locations: GasLocation[] }>(
+    'getLocations'
+  );
   return data.locations ?? [];
 }
 
 export async function gasSaveLocation(
   location: Record<string, unknown>
 ): Promise<GasLocation> {
-  const data = await gasRequest<{ location: GasLocation }>('saveLocation', {
+  const data = await backendRequest<{ location: GasLocation }>('saveLocation', {
     location,
   });
   return data.location;
 }
 
 export async function gasDeleteLocation(id: string): Promise<void> {
-  await gasRequest('deleteLocation', { id });
+  await backendRequest('deleteLocation', { id });
 }
 
 export type GasLocationProduct = {
@@ -138,7 +208,7 @@ export type GasLocationProduct = {
 export async function gasGetLocationProducts(
   locationId?: string
 ): Promise<GasLocationProduct[]> {
-  const data = await gasRequest<{ links: GasLocationProduct[] }>(
+  const data = await backendRequest<{ links: GasLocationProduct[] }>(
     'getLocationProducts',
     { locationId: locationId ?? null }
   );
@@ -154,9 +224,93 @@ export async function gasSetLocationProducts(
   productIds: string[],
   links?: GasLocationProduct[]
 ): Promise<void> {
-  await gasRequest('setLocationProducts', {
+  await backendRequest('setLocationProducts', {
     locationId,
     productIds,
     links: links ?? null,
   });
+}
+
+// ---------- Categories ----------
+export type GasCategory = {
+  id: string;
+  name: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function gasGetCategories(): Promise<GasCategory[]> {
+  const data = await backendRequest<{ categories: GasCategory[] }>(
+    'getCategories'
+  );
+  return data.categories ?? [];
+}
+
+export async function gasSaveCategory(
+  category: Record<string, unknown>
+): Promise<GasCategory> {
+  const data = await backendRequest<{ category: GasCategory }>('saveCategory', {
+    category,
+  });
+  return data.category;
+}
+
+export async function gasDeleteCategory(id: string): Promise<void> {
+  await backendRequest('deleteCategory', { id });
+}
+
+// ---------- Partners ----------
+export type GasPartner = {
+  id: string;
+  name: string;
+  code?: string;
+  /** Comma-separated roles e.g. "supplier,customer" */
+  roles?: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function gasGetPartners(): Promise<GasPartner[]> {
+  const data = await backendRequest<{ partners: GasPartner[] }>('getPartners');
+  return data.partners ?? [];
+}
+
+export async function gasSavePartner(
+  partner: Record<string, unknown>
+): Promise<GasPartner> {
+  const data = await backendRequest<{ partner: GasPartner }>('savePartner', {
+    partner,
+  });
+  return data.partner;
+}
+
+export async function gasDeletePartner(id: string): Promise<void> {
+  await backendRequest('deletePartner', { id });
+}
+
+export type GasPartnerProduct = {
+  partnerId: string;
+  productId: string;
+  role: string;
+};
+
+export async function gasGetPartnerProducts(
+  partnerId?: string
+): Promise<GasPartnerProduct[]> {
+  const data = await backendRequest<{ links: GasPartnerProduct[] }>(
+    'getPartnerProducts',
+    { partnerId: partnerId ?? null }
+  );
+  return data.links ?? [];
+}
+
+export async function gasSetPartnerProducts(
+  partnerId: string,
+  links: GasPartnerProduct[]
+): Promise<void> {
+  await backendRequest('setPartnerProducts', { partnerId, links });
 }
