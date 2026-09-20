@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, LogIn, Loader2 } from 'lucide-react';
 import { setSession, isLoggedIn, getD1ApiUrl } from '../../lib/syncConfig';
@@ -19,7 +18,7 @@ export function Login() {
 
   const apiReady = Boolean(getD1ApiUrl());
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!tenantId.trim() || !username.trim() || pin.length < 4) {
