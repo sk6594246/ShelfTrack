@@ -153,3 +153,34 @@ body {
   background: var(--st-primary-soft);
   color: var(--st-primary);
 }
+
+/* Floor-shift UI #89 #92 */
+html[data-role='admin'] {
+  --st-primary: #4f46e5;
+  --st-primary-soft: #eef2ff;
+}
+html[data-role='manager'] {
+  --st-primary: #0d9488;
+  --st-primary-soft: #ccfbf1;
+}
+html[data-role='worker'] {
+  --st-primary: #d97706;
+  --st-primary-soft: #fef3c7;
+}
+html[data-theme='night'][data-role='admin'] {
+  --st-primary: #818cf8;
+  --st-primary-soft: #1e1b4b;
+}
+html[data-theme='night'][data-role='manager'] {
+  --st-primary: #2dd4bf;
+  --st-primary-soft: #134e4a;
+}
+html[data-theme='night'][data-role='worker'] {
+  --st-primary: #fbbf24;
+  --st-primary-soft: #78350f;
+}
+
+.st-tap {
+  min-height: 44px;
+  min-width: 44px;
+}
