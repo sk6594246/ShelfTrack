@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, LogIn, Loader2 } from 'lucide-react';
 import { setSession, isLoggedIn, getD1ApiUrl } from '../../lib/syncConfig';
@@ -143,7 +144,7 @@ export function Login() {
         </form>
 
         <p className="mt-6 text-center text-[11px] text-slate-400">
-          Multi-company · each tenant has its own users &amp; data
+          Multi-company · each tenant has its own users & data
         </p>
       </div>
     </div>
