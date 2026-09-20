@@ -15,24 +15,38 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
   return (
     <Link
       to={`/products/${product.id}`}
-      className="group block rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-100/50"
+      className="group block rounded-2xl border p-4 shadow-sm transition-all duration-200 active:scale-[0.99]"
+      style={{
+        background: 'var(--st-surface)',
+        borderColor: 'var(--st-border)',
+        boxShadow: 'var(--st-shadow)',
+      }}
     >
       <div className="flex items-start gap-3.5">
         <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition ${
-            isOut
-              ? 'bg-rose-50 text-rose-500'
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition"
+          style={{
+            background: isOut
+              ? 'color-mix(in srgb, var(--st-danger) 12%, transparent)'
               : isLow
-                ? 'bg-amber-50 text-amber-600'
-                : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100'
-          }`}
+                ? 'color-mix(in srgb, var(--st-warning) 15%, transparent)'
+                : 'var(--st-primary-soft)',
+            color: isOut
+              ? 'var(--st-danger)'
+              : isLow
+                ? 'var(--st-warning)'
+                : 'var(--st-primary)',
+          }}
         >
           <Package className="h-5 w-5" strokeWidth={2} />
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-[15px] font-semibold tracking-tight text-slate-900">
+            <h3
+              className="truncate text-[15px] font-semibold tracking-tight"
+              style={{ color: 'var(--st-text)' }}
+            >
               {product.name}
             </h3>
             <StatusBadge
@@ -42,31 +56,54 @@ export function ProductCard({ product, compact = false }: ProductCardProps) {
             />
           </div>
 
-          <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
-            SKU · {product.sku}
-          </p>
+          <div
+            className="mt-1.5 flex items-center gap-2 rounded-md px-2 py-1 font-mono text-[11px]"
+            style={{
+              background: 'var(--st-surface-2)',
+              color: 'var(--st-muted)',
+            }}
+          >
+            <span className="font-semibold tracking-wide">SKU</span>
+            <span className="truncate">{product.sku}</span>
+            {product.barcode ? (
+              <>
+                <span style={{ opacity: 0.4 }}>·</span>
+                <span className="truncate opacity-80">{product.barcode}</span>
+              </>
+            ) : null}
+          </div>
 
           <div className="mt-3 flex items-end justify-between gap-2">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p
+                className="text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--st-muted)' }}
+              >
                 Qty
               </p>
               <p
-                className={`st-num text-xl font-bold leading-none tracking-tight ${
-                  isOut
-                    ? 'text-rose-600'
+                className="st-num text-2xl font-bold leading-none tracking-tight"
+                style={{
+                  color: isOut
+                    ? 'var(--st-danger)'
                     : isLow
-                      ? 'text-amber-600'
-                      : 'text-slate-900'
-                }`}
+                      ? 'var(--st-warning)'
+                      : 'var(--st-text)',
+                }}
               >
                 {product.quantity}
               </p>
             </div>
 
             {product.location && (
-              <span className="inline-flex max-w-[45%] items-center gap-1 truncate rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200/80">
-                <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+              <span
+                className="inline-flex max-w-[45%] items-center gap-1 truncate rounded-lg px-2 py-1 text-[11px] font-medium"
+                style={{
+                  background: 'var(--st-surface-2)',
+                  color: 'var(--st-muted)',
+                }}
+              >
+                <MapPin className="h-3 w-3 shrink-0" />
                 {product.location}
               </span>
             )}
