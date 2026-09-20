@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useProducts, useProduct } from '../hooks/useProducts';
-import type { Product } from '../types/inventory';
+import type { Product, Location, Category } from '../types/inventory';
+import {
+  getCategories,
+  getLocations,
+  getLocationsCached,
+  seedMastersIfEmpty,
+} from '../store/mastersStore';
 
 type FormState = {
   name: string;
@@ -39,6 +45,22 @@ export function ProductForm() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  // Load masters for dropdowns
+  useEffect(() => {
+    seedMastersIfEmpty();
+    setCategories(getCategories());
+    void (async () => {
+      try {
+        const locs = await getLocations();
+        setLocations(locs);
+      } catch {
+        setLocations(getLocationsCached());
+      }
+    })();
+  }, []);
 
   // Prefill from navigation state (coming from Scan) or existing product
   useEffect(() => {
@@ -76,7 +98,7 @@ export function ProductForm() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault: () => void }) {
     e.preventDefault();
     setError(null);
 
@@ -100,8 +122,8 @@ export function ProductForm() {
         notes: form.notes.trim() || undefined,
       });
       navigate(`/products/${saved.id}`, { replace: true });
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -115,10 +137,28 @@ export function ProductForm() {
     );
   }
 
+  // If edit has a value not in master list, still show it as an option
+  const categoryOptions = (() => {
+    const names = categories.map((c) => c.name);
+    if (form.category && !names.includes(form.category)) {
+      return [form.category, ...names];
+    }
+    return names;
+  })();
+
+  const locationOptions = (() => {
+    const names = locations.map((l) => l.name);
+    if (form.location && !names.includes(form.location)) {
+      return [form.location, ...names];
+    }
+    return names;
+  })();
+
   return (
     <div className="mx-auto w-full max-w-lg p-4 md:p-6">
       <header className="mb-6 flex items-center gap-3">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
           aria-label="Back"
@@ -129,17 +169,19 @@ export function ProductForm() {
           <h1 className="text-xl font-bold text-slate-900">
             {isEdit ? 'Edit product' : 'Add product'}
           </h1>
-          {(location.state as any)?.rawQR && (
+          {(location.state as { rawQR?: string })?.rawQR && (
             <p className="text-xs text-slate-500">
-              Prefilling from QR: {(location.state as any).rawQR}
+              Prefilling from QR: {(location.state as { rawQR?: string }).rawQR}
             </p>
           )}
         </div>
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
         {error && (
-          <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+          <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
         )}
 
         <Field label="Name *" required>
@@ -183,20 +225,42 @@ export function ProductForm() {
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Category">
-            <input
+            <select
               value={form.category}
               onChange={(e) => update('category', e.target.value)}
               className="input"
-              placeholder="e.g. Electronics"
-            />
+            >
+              <option value="">Select category</option>
+              {categoryOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            {categories.length === 0 && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Add categories under Masters
+              </p>
+            )}
           </Field>
           <Field label="Location">
-            <input
+            <select
               value={form.location}
               onChange={(e) => update('location', e.target.value)}
               className="input"
-              placeholder="Shelf A1"
-            />
+            >
+              <option value="">Select location</option>
+              {locationOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            {locations.length === 0 && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Add locations under Masters
+              </p>
+            )}
           </Field>
         </div>
 
@@ -253,6 +317,9 @@ export function ProductForm() {
         .input:focus {
           border-color: #818cf8;
           box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+        select.input {
+          appearance: auto;
         }
       `}</style>
     </div>
