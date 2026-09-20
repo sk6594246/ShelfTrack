@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Cloud, RefreshCw } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Cloud, RefreshCw, LogOut, User } from 'lucide-react';
 import { ChevronRight, QrCode, Trash2, Moon, Sun, Palette } from 'lucide-react';
 import { useQRMapping } from '../../hooks/useQRMapping';
 import { mappingSummary } from '../../lib/qr';
@@ -18,12 +18,15 @@ import {
   getGasWebAppUrl,
   ensureTenant,
 } from '../../lib/gasApi';
+import { getSession, clearSession } from '../../lib/syncConfig';
 import { getLocations, getCategories, getPartners } from '../../store/mastersStore';
 import { getProducts } from '../../store/inventoryStore';
 import { toast } from '../../components/ui/Toast';
 
 export function Settings() {
+  const navigate = useNavigate();
   const { config } = useQRMapping();
+  const session = getSession();
   const [mode, setMode] = useState<ThemeMode>(() => getThemeMode());
   const [accent, setAccentState] = useState(() => getAccent());
   const [customHex, setCustomHex] = useState(() => getAccent());
@@ -34,8 +37,13 @@ export function Settings() {
   function clearAllData() {
     if (window.confirm('Delete all products and settings? This cannot be undone.')) {
       localStorage.clear();
-      window.location.reload();
+      window.location.href = '/login';
     }
+  }
+
+  function logout() {
+    clearSession();
+    navigate('/login', { replace: true });
   }
 
   function onMode(next: ThemeMode) {
@@ -55,9 +63,57 @@ export function Settings() {
           Settings
         </h1>
         <p className="mt-0.5 text-sm" style={{ color: 'var(--st-muted)' }}>
-          Theme, sheet sync, scanning, and data
+          Theme, cloud sync, scanning, and data
         </p>
       </header>
+
+      <section className="mb-6">
+        <p
+          className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--st-muted)' }}
+        >
+          Signed in
+        </p>
+        <div
+          className="space-y-3 overflow-hidden rounded-2xl border p-4 shadow-sm"
+          style={{
+            background: 'var(--st-surface)',
+            borderColor: 'var(--st-border)',
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-xl"
+              style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+            >
+              <User className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold" style={{ color: 'var(--st-text)' }}>
+                {session?.displayName || session?.username || '—'}
+              </p>
+              <p className="mt-0.5 text-xs" style={{ color: 'var(--st-muted)' }}>
+                {session
+                  ? `${session.tenantName || session.tenantId} · ${session.role} · @${session.username}`
+                  : 'Not signed in'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium"
+            style={{
+              borderColor: 'var(--st-border)',
+              color: 'var(--st-text)',
+              background: 'var(--st-surface-2)',
+            }}
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
+      </section>
 
       <section className="mb-6">
         <p
@@ -211,7 +267,7 @@ export function Settings() {
               <p className="mt-0.5 text-xs break-all" style={{ color: 'var(--st-muted)' }}>
                 {gasOn
                   ? gasUrl.slice(0, 48) + (gasUrl.length > 48 ? '…' : '')
-                  : 'Set VITE_D1_API_URL (or VITE_GAS_WEB_APP_URL) at build time, then redeploy. Without it, data stays on this device only.'}
+                  : 'Set VITE_D1_API_URL at build time, then redeploy.'}
               </p>
             </div>
           </div>
