@@ -13,12 +13,29 @@ import { QRMapping } from './pages/settings/QRMapping';
 import { Masters } from './pages/masters/Masters';
 import { Documents } from './pages/documents/Documents';
 import { DocumentDetail } from './pages/documents/DocumentDetail';
+import { Login } from './pages/auth/Login';
+import { isLoggedIn } from './lib/syncConfig';
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  if (!isLoggedIn()) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<AppShell />}>
+        <Route path="/login" element={<Login />} />
+
+        <Route
+          element={
+            <RequireAuth>
+              <AppShell />
+            </RequireAuth>
+          }
+        >
           <Route index element={<Dashboard />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="stock" element={<StockMap />} />
