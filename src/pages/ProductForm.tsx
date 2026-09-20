@@ -17,8 +17,8 @@ type FormState = {
   customId: string;
   category: string;
   location: string;
-  quantity: number;
-  reorderPoint: number;
+  quantity: string;
+  reorderPoint: string;
   notes: string;
 };
 
@@ -29,10 +29,15 @@ const emptyForm: FormState = {
   customId: '',
   category: '',
   location: '',
-  quantity: 0,
-  reorderPoint: 5,
+  quantity: '0',
+  reorderPoint: '5',
   notes: '',
 };
+
+function parseQty(raw: string): number {
+  const n = Number(String(raw).trim());
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
 
 export function ProductForm() {
   const { id } = useParams();
@@ -48,7 +53,6 @@ export function ProductForm() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
-  // Load masters for dropdowns
   useEffect(() => {
     seedMastersIfEmpty();
     setCategories(getCategories());
@@ -62,7 +66,6 @@ export function ProductForm() {
     })();
   }, []);
 
-  // Prefill from navigation state (coming from Scan) or existing product
   useEffect(() => {
     if (isEdit && product) {
       setForm({
@@ -72,8 +75,8 @@ export function ProductForm() {
         customId: product.customId ?? '',
         category: product.category ?? '',
         location: product.location ?? '',
-        quantity: product.quantity,
-        reorderPoint: product.reorderPoint,
+        quantity: String(product.quantity ?? 0),
+        reorderPoint: String(product.reorderPoint ?? 0),
         notes: product.notes ?? '',
       });
       return;
@@ -117,8 +120,8 @@ export function ProductForm() {
         customId: form.customId.trim() || undefined,
         category: form.category.trim() || undefined,
         location: form.location.trim() || undefined,
-        quantity: Number(form.quantity) || 0,
-        reorderPoint: Number(form.reorderPoint) || 0,
+        quantity: parseQty(form.quantity),
+        reorderPoint: parseQty(form.reorderPoint),
         notes: form.notes.trim() || undefined,
       });
       navigate(`/products/${saved.id}`, { replace: true });
@@ -137,7 +140,6 @@ export function ProductForm() {
     );
   }
 
-  // If edit has a value not in master list, still show it as an option
   const categoryOptions = (() => {
     const names = categories.map((c) => c.name);
     if (form.category && !names.includes(form.category)) {
@@ -267,20 +269,28 @@ export function ProductForm() {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Quantity">
             <input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
               value={form.quantity}
-              onChange={(e) => update('quantity', Number(e.target.value))}
+              onChange={(e) =>
+                update('quantity', e.target.value.replace(/[^0-9.]/g, ''))
+              }
               className="input"
+              placeholder="0"
             />
           </Field>
           <Field label="Reorder point">
             <input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
               value={form.reorderPoint}
-              onChange={(e) => update('reorderPoint', Number(e.target.value))}
+              onChange={(e) =>
+                update('reorderPoint', e.target.value.replace(/[^0-9.]/g, ''))
+              }
               className="input"
+              placeholder="0"
             />
           </Field>
         </div>
