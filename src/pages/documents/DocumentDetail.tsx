@@ -53,7 +53,7 @@ export function DocumentDetail() {
   const [locationId, setLocationId] = useState('');
   const [fromLocationId, setFromLocationId] = useState('');
   const [toLocationId, setToLocationId] = useState('');
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState('1');
   const [notes, setNotes] = useState('');
   const [purchaseDate, setPurchaseDate] = useState('');
   const [mfgDate, setMfgDate] = useState('');
@@ -136,15 +136,16 @@ export function DocumentDetail() {
     }
   }
 
-  function handleAddLine(e: React.FormEvent) {
+  function handleAddLine(e: { preventDefault: () => void }) {
     e.preventDefault();
-    if (!doc || !isDraft || !productId || qty < 1) return;
+    const qtyNum = Number(qty);
+    if (!doc || !isDraft || !productId || !Number.isFinite(qtyNum) || qtyNum < 1) return;
     setError(null);
     try {
       if (doc.type === 'transfer') {
         addLine(doc.id, {
           productId,
-          quantity: qty,
+          quantity: qtyNum,
           fromLocationId: fromLocationId || UNLOCATED_LOCATION_ID,
           toLocationId: toLocationId || undefined,
           notes: notes || undefined,
@@ -152,7 +153,7 @@ export function DocumentDetail() {
       } else {
         addLine(doc.id, {
           productId,
-          quantity: qty,
+          quantity: qtyNum,
           locationId: locationId || undefined,
           notes: notes || undefined,
           purchaseDate: purchaseDate || undefined,
@@ -164,7 +165,7 @@ export function DocumentDetail() {
       setLocationId('');
       setFromLocationId('');
       setToLocationId('');
-      setQty(1);
+      setQty('1');
       setNotes('');
       reload();
     } catch (err: unknown) {
@@ -326,14 +327,23 @@ export function DocumentDetail() {
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase text-slate-400">Qty</span>
-                <div className="flex items-center rounded-xl border border-slate-200 bg-white">
-                  <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-11 w-11 items-center justify-center text-lg font-bold text-slate-600" aria-label="Decrease">−</button>
-                  <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} className="st-num w-14 border-x border-slate-200 py-2 text-center text-base font-semibold outline-none" />
-                  <button type="button" onClick={() => setQty((q) => q + 1)} className="flex h-11 w-11 items-center justify-center text-lg font-bold text-slate-600" aria-label="Increase">+</button>
-                </div>
-                <input type="text" placeholder="Line note" value={notes} onChange={(e) => setNotes(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+              <div className="grid grid-cols-[1fr_2fr] gap-2">
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">Qty</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={qty}
+                    onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ''))}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    placeholder="1"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">Note</span>
+                  <input type="text" placeholder="Line note" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                </label>
               </div>
               <button type="submit" className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white">
                 <Plus className="h-4 w-4" /> Add line
