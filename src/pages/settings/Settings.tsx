@@ -63,7 +63,7 @@ export function Settings() {
           Settings
         </h1>
         <p className="mt-0.5 text-sm" style={{ color: 'var(--st-muted)' }}>
-          Theme, cloud sync, scanning, and data
+          Company · Appearance · Sync · Danger zone
         </p>
       </header>
 
@@ -72,7 +72,7 @@ export function Settings() {
           className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider"
           style={{ color: 'var(--st-muted)' }}
         >
-          Signed in
+          Company
         </p>
         <div
           className="space-y-3 overflow-hidden rounded-2xl border p-4 shadow-sm"
@@ -237,7 +237,7 @@ export function Settings() {
           className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider"
           style={{ color: 'var(--st-muted)' }}
         >
-          Cloud sync
+          Sync
         </p>
         <div
           className="space-y-3 overflow-hidden rounded-2xl border p-4 shadow-sm"
@@ -352,7 +352,7 @@ export function Settings() {
           className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider"
           style={{ color: 'var(--st-muted)' }}
         >
-          Data
+          Danger zone
         </p>
         <div
           className="overflow-hidden rounded-2xl border shadow-sm"
