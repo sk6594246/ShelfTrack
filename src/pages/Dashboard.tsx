@@ -2,113 +2,31 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowRight,
-  MapPin,
+  Grid3x3,
   Package,
   QrCode,
   Truck,
+  ClipboardList,
 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
-import {
-  getLocationById,
-  getLocations,
-  getProductsForLocation,
-} from '../store/mastersStore';
-import { getAvailableQtyAtLocation, getExpiringBatches } from '../store/stockBatchStore';
+import { getLocations } from '../store/mastersStore';
+import { getExpiringBatches } from '../store/stockBatchStore';
 import { getDocuments } from '../store/documentsStore';
-
-const LOC_KEY = 'st_dash_location';
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  tone?: 'neutral' | 'warning' | 'danger' | 'success';
-}) {
-  const tones = {
-    neutral: {
-      wrap: 'border-slate-200/90 bg-white',
-      icon: 'bg-slate-100 text-slate-600',
-      value: 'text-slate-900',
-      label: 'text-slate-500',
-    },
-    warning: {
-      wrap: 'border-amber-200/80 bg-gradient-to-br from-amber-50 to-white',
-      icon: 'bg-amber-100 text-amber-700',
-      value: 'text-amber-900',
-      label: 'text-amber-700/80',
-    },
-    danger: {
-      wrap: 'border-rose-200/80 bg-gradient-to-br from-rose-50 to-white',
-      icon: 'bg-rose-100 text-rose-700',
-      value: 'text-rose-900',
-      label: 'text-rose-700/80',
-    },
-    success: {
-      wrap: 'border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white',
-      icon: 'bg-emerald-100 text-emerald-700',
-      value: 'text-emerald-900',
-      label: 'text-emerald-700/80',
-    },
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${tones.wrap}`}>
-      <div className="flex items-center gap-2.5">
-        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tones.icon}`}>
-          <Icon className="h-4 w-4" strokeWidth={2.25} />
-        </div>
-        <span className={`text-xs font-semibold uppercase tracking-wide ${tones.label}`}>
-          {label}
-        </span>
-      </div>
-      <p className={`st-num mt-3 text-3xl font-bold tracking-tight ${tones.value}`}>{value}</p>
-    </div>
-  );
-}
-
-function SkeletonDashboard() {
-  return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-6">
-      <div className="space-y-2">
-        <div className="st-skeleton h-8 w-48" />
-        <div className="st-skeleton h-4 w-64" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="st-skeleton h-24 rounded-2xl" />
-        ))}
-      </div>
-    </div>
-  );
-}
+import { EmptyState } from '../components/ui/EmptyState';
 
 export function Dashboard() {
   const { products, loading } = useProducts();
   const [locations, setLocations] = useState<import('../types/inventory').Location[]>([]);
-  const [locationId, setLocationId] = useState(() => {
-    try {
-      return localStorage.getItem(LOC_KEY) || '';
-    } catch {
-      return '';
-    }
-  });
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const locs = await getLocations();
+    void getLocations()
+      .then((locs) => {
         if (!cancelled) setLocations(locs);
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) setLocations([]);
-      }
-    })();
+      });
     function onHydrated() {
       if (!cancelled) {
         void getLocations().then((locs) => {
@@ -123,230 +41,204 @@ export function Dashboard() {
     };
   }, [products]);
 
-  useEffect(() => {
-    try {
-      if (locationId) localStorage.setItem(LOC_KEY, locationId);
-      else localStorage.removeItem(LOC_KEY);
-    } catch {
-      /* ignore */
-    }
-  }, [locationId]);
-
-  const scoped = useMemo(() => {
-    if (!locationId) {
-      return products.map((p) => ({ product: p, qty: p.quantity }));
-    }
-    return products
-      .map((p) => ({
-        product: p,
-        qty: getAvailableQtyAtLocation(p.id, locationId),
-      }))
-      .filter((r) => {
-        const assigned = getProductsForLocation(locationId);
-        return assigned.includes(r.product.id) || r.qty > 0;
-      });
-  }, [products, locationId]);
-
-  const total = scoped.length;
-  const totalUnits = scoped.reduce((s, r) => s + r.qty, 0);
-  const lowStock = scoped.filter((r) => r.qty > 0 && r.qty <= r.product.reorderPoint);
-  const outOfStock = scoped.filter((r) => r.qty <= 0);
-  const attention = [...outOfStock, ...lowStock];
-
-  const expiring = useMemo(() => {
-    return getExpiringBatches(30)
-      .map((r) => ({
-        ...r,
-        product: products.find((p) => p.id === r.productId),
-        location: getLocationById(r.locationId),
-      }))
-      .filter((r) => !locationId || r.locationId === locationId)
-      .slice(0, 8);
-  }, [products, locationId]);
-
+  const lowStock = useMemo(
+    () => products.filter((p) => p.quantity > 0 && p.quantity <= p.reorderPoint),
+    [products]
+  );
+  const outOfStock = useMemo(
+    () => products.filter((p) => p.quantity <= 0),
+    [products]
+  );
   const openDocs = getDocuments().filter((d) => d.status === 'draft').length;
-  const shiftExpiring = expiring.length;
+  const expiring = useMemo(() => getExpiringBatches(30).length, [products]);
 
-  const selectedLoc = locations.find((l) => l.id === locationId);
-  const scopeLabel = selectedLoc
-    ? selectedLoc.code
-      ? `${selectedLoc.name} (${selectedLoc.code})`
-      : selectedLoc.name
-    : 'All locations';
+  const alerts: { label: string; value: number; to: string; warn: boolean }[] = [
+    { label: 'Open drafts', value: openDocs, to: '/documents', warn: openDocs > 0 },
+    { label: 'Low stock', value: lowStock.length, to: '/inventory', warn: lowStock.length > 0 },
+    { label: 'Out of stock', value: outOfStock.length, to: '/inventory', warn: outOfStock.length > 0 },
+    { label: 'Expiring 30d', value: expiring, to: '/stock', warn: expiring > 0 },
+  ];
 
-  if (loading) return <SkeletonDashboard />;
+  const tiles = [
+    { to: '/receive', label: 'Receive', sub: 'Inbound GR', icon: Truck },
+    { to: '/pick', label: 'Pick', sub: 'Walk list', icon: ClipboardList },
+    { to: '/scan', label: 'Scan', sub: 'QR / barcode', icon: QrCode },
+    { to: '/stock', label: 'Stock', sub: 'Floor map', icon: Grid3x3 },
+  ];
+
+  if (loading) {
+    return (
+      <div className="mx-auto w-full max-w-lg space-y-4 p-4">
+        <div className="st-skeleton h-8 w-40" />
+        <div className="st-skeleton h-12 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="st-skeleton h-28 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const hasAnyData = products.length > 0 || locations.length > 0 || openDocs > 0;
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-[1.75rem]">
-            Dashboard
-          </h1>
-          <p className="mt-0.5 text-sm text-slate-500">Live overview · {scopeLabel}</p>
-        </div>
-        <Link
-          to="/scan"
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
-        >
-          <QrCode className="h-4 w-4" />
-          Scan
-        </Link>
+    <div className="mx-auto w-full max-w-lg p-4 pb-8 st-page">
+      <header className="mb-4">
+        <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--st-text)' }}>
+          Shift board
+        </h1>
+        <p className="mt-0.5 text-sm" style={{ color: 'var(--st-muted)' }}>
+          Four actions · stay on the floor
+        </p>
       </header>
 
-      <section className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Shift HUD</p>
-          <span className="text-[11px] font-medium text-slate-400">{scopeLabel}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
-          {[
-            { label: 'Open docs', value: openDocs, to: '/documents', warn: openDocs > 0 },
-            { label: 'Low stock', value: lowStock.length, to: '/inventory', warn: lowStock.length > 0 },
-            { label: 'Out of stock', value: outOfStock.length, to: '/inventory', warn: outOfStock.length > 0 },
-            { label: 'Expiring 30d', value: shiftExpiring, to: '/stock', warn: shiftExpiring > 0 },
-          ].map((cell) => (
-            <Link
-              key={cell.label}
-              to={cell.to}
-              className="flex flex-col gap-1 bg-white px-4 py-3 transition hover:bg-slate-50"
+      <div
+        className="mb-4 grid grid-cols-4 gap-px overflow-hidden rounded-2xl border"
+        style={{ borderColor: 'var(--st-border)', background: 'var(--st-border)' }}
+      >
+        {alerts.map((a) => (
+          <Link
+            key={a.label}
+            to={a.to}
+            className="flex flex-col items-center gap-0.5 px-1 py-2.5 text-center transition active:opacity-80"
+            style={{ background: 'var(--st-surface)' }}
+          >
+            <span
+              className="st-num text-lg font-bold leading-none"
+              style={{ color: a.warn ? 'var(--st-warning)' : 'var(--st-text)' }}
             >
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                {cell.label}
-              </span>
-              <span
-                className={`st-num text-2xl font-bold tracking-tight ${
-                  cell.warn ? 'text-amber-700' : 'text-slate-900'
-                }`}
-              >
-                {cell.value}
-              </span>
-            </Link>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2 border-t border-slate-100 p-3">
-          <Link
-            to="/receive"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"
-          >
-            <Truck className="h-3.5 w-3.5" />
-            Receive dock
+              {a.value}
+            </span>
+            <span className="text-[10px] font-semibold leading-tight" style={{ color: 'var(--st-muted)' }}>
+              {a.label}
+            </span>
           </Link>
-          <Link
-            to="/pick"
-            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-          >
-            Pick list
-          </Link>
-          <Link
-            to="/stock"
-            className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-          >
-            Stock map
-          </Link>
-        </div>
-      </section>
+        ))}
+      </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <label className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <MapPin className="h-3.5 w-3.5" />
-          Location
-        </label>
-        <select
-          value={locationId}
-          onChange={(e) => setLocationId(e.target.value)}
-          className="min-w-[12rem] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:flex-none"
+      <div className="grid grid-cols-2 gap-3">
+        {tiles.map((t) => (
+          <Link
+            key={t.to}
+            to={t.to}
+            className="st-tap st-enter flex flex-col items-start gap-3 rounded-2xl border p-4 transition active:scale-[0.98]"
+            style={{
+              background: 'var(--st-surface)',
+              borderColor: 'var(--st-border)',
+              boxShadow: 'var(--st-shadow)',
+            }}
+          >
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl text-white"
+              style={{ background: 'var(--st-primary)' }}
+            >
+              <t.icon className="h-6 w-6" strokeWidth={2.25} />
+            </div>
+            <div>
+              <p className="text-base font-bold" style={{ color: 'var(--st-text)' }}>
+                {t.label}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--st-muted)' }}>
+                {t.sub}
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          to="/inventory"
+          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
+          style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
         >
-          <option value="">All locations</option>
-          {locations.map((loc) => (
-            <option key={loc.id} value={loc.id}>
-              {loc.name}
-              {loc.code ? ` (${loc.code})` : ''}
-            </option>
-          ))}
-        </select>
-        {locationId ? (
-          <button
-            type="button"
-            onClick={() => setLocationId('')}
-            className="text-xs font-semibold text-indigo-600"
+          <Package className="h-3.5 w-3.5" style={{ color: 'var(--st-primary)' }} />
+          Inventory
+        </Link>
+        <Link
+          to="/documents"
+          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
+          style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
+        >
+          Documents
+        </Link>
+        <Link
+          to="/masters"
+          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
+          style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
+        >
+          Masters
+        </Link>
+      </div>
+
+      {!hasAnyData && (
+        <div className="mt-6">
+          <EmptyState
+            icon={Package}
+            title="Empty floor"
+            description="Add a location or receive first stock to start the shift."
+            tone="indigo"
           >
-            Clear
-          </button>
-        ) : null}
-      </div>
-
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MetricCard label="SKUs" value={total} icon={Package} />
-        <MetricCard label="Units" value={totalUnits} icon={Package} tone="success" />
-        <MetricCard
-          label="Low stock"
-          value={lowStock.length}
-          icon={AlertTriangle}
-          tone={lowStock.length ? 'warning' : 'neutral'}
-        />
-        <MetricCard
-          label="Out of stock"
-          value={outOfStock.length}
-          icon={AlertTriangle}
-          tone={outOfStock.length ? 'danger' : 'neutral'}
-        />
-      </div>
-
-      {attention.length > 0 ? (
-        <section className="mb-6 rounded-2xl border border-amber-200/80 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Needs attention</h2>
-            <Link to="/inventory" className="text-xs font-semibold text-indigo-600">
-              Inventory <ArrowRight className="inline h-3 w-3" />
+            <Link
+              to="/masters"
+              className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
+              style={{ background: 'var(--st-primary)' }}
+            >
+              Add first location
             </Link>
+            <Link
+              to="/receive"
+              className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
+              style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)' }}
+            >
+              Receive stock
+            </Link>
+          </EmptyState>
+        </div>
+      )}
+
+      {(lowStock.length > 0 || outOfStock.length > 0) && (
+        <section
+          className="mt-6 rounded-2xl border p-4"
+          style={{ background: 'var(--st-surface)', borderColor: 'var(--st-border)' }}
+        >
+          <div className="mb-2 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" style={{ color: 'var(--st-warning)' }} />
+            <h2 className="text-sm font-bold" style={{ color: 'var(--st-text)' }}>
+              Needs attention
+            </h2>
           </div>
-          <ul className="divide-y divide-slate-100">
-            {attention.slice(0, 8).map(({ product, qty }) => (
-              <li key={product.id}>
+          <ul className="space-y-1">
+            {[...outOfStock, ...lowStock].slice(0, 6).map((p) => (
+              <li key={p.id}>
                 <Link
-                  to={`/products/${product.id}`}
-                  className="flex items-center justify-between gap-3 py-2.5 text-sm hover:bg-slate-50"
+                  to={`/products/${p.id}`}
+                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm"
+                  style={{ color: 'var(--st-text)' }}
                 >
-                  <span className="min-w-0 truncate font-medium text-slate-800">{product.name}</span>
+                  <span className="min-w-0 truncate font-medium">{p.name}</span>
                   <span
-                    className={`st-num shrink-0 font-semibold ${
-                      qty <= 0 ? 'text-rose-600' : 'text-amber-700'
-                    }`}
+                    className="st-num shrink-0 font-bold"
+                    style={{
+                      color: p.quantity <= 0 ? 'var(--st-danger)' : 'var(--st-warning)',
+                    }}
                   >
-                    {qty}
+                    {p.quantity}
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
+          <Link
+            to="/inventory"
+            className="mt-2 block text-center text-xs font-semibold"
+            style={{ color: 'var(--st-primary)' }}
+          >
+            Full inventory →
+          </Link>
         </section>
-      ) : null}
-
-      {expiring.length > 0 ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Expiring within 30 days</h2>
-          <ul className="space-y-2">
-            {expiring.map((row) => (
-              <li
-                key={`${row.productId}-${row.locationId}-${row.expiryDate}`}
-                className="flex items-center justify-between gap-2 text-sm"
-              >
-                <span className="truncate text-slate-800">
-                  {row.product?.name || row.productId}
-                  <span className="text-slate-400">
-                    {' '}
-                    · {row.location?.name || row.locationId}
-                  </span>
-                </span>
-                <span className="st-num shrink-0 text-xs font-semibold text-amber-700">
-                  {row.expiryDate}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      )}
     </div>
   );
 }
