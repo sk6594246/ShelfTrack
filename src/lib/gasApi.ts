@@ -5,9 +5,11 @@
  * Fall back to Google Apps Script when VITE_GAS_WEB_APP_URL is set.
  * If neither is set, callers should use localStorage only.
  *
- * D1 Worker: POST { action, tenantId?, ...payload }
- * Default tenant: "default" (auto-created by Worker).
+ * D1 Worker: POST { action, tenantId, username?, pin?, ...payload }
+ * After login, session credentials are attached automatically.
  */
+
+import { getSession } from './syncConfig';
 
 const D1_URL = import.meta.env.VITE_D1_API_URL as string | undefined;
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL as string | undefined;
@@ -38,6 +40,8 @@ export function getGasWebAppUrl(): string {
 
 export function getTenantId(): string {
   try {
+    const session = getSession();
+    if (session?.tenantId) return session.tenantId;
     const stored = localStorage.getItem(TENANT_KEY);
     if (stored && stored.trim()) return stored.trim();
   } catch {
@@ -59,14 +63,21 @@ async function backendRequest<T>(
   payload: Record<string, unknown> = {}
 ): Promise<T> {
   if (isD1Enabled()) {
+    const session = getSession();
+    const body: Record<string, unknown> = {
+      action,
+      tenantId: session?.tenantId || getTenantId(),
+      ...payload,
+    };
+    // Attach user credentials when logged in (Worker requireUser / requireTenant)
+    if (session) {
+      if (body.username == null) body.username = session.username;
+      if (body.pin == null) body.pin = session.pin;
+    }
     const res = await fetch(D1_URL!, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action,
-        tenantId: getTenantId(),
-        ...payload,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       throw new Error(`D1 API failed: ${res.status} ${res.statusText}`);
@@ -101,6 +112,9 @@ async function backendRequest<T>(
 /** Ensure default tenant exists on D1 (no-op for GAS). */
 export async function ensureTenant(): Promise<string> {
   if (!isD1Enabled()) return getTenantId();
+  // If logged in, just return session tenant — no anonymous ensure
+  const session = getSession();
+  if (session?.tenantId) return session.tenantId;
   const data = await backendRequest<{ tenantId?: string }>('ensureTenant');
   if (data.tenantId) setTenantId(data.tenantId);
   return getTenantId();
