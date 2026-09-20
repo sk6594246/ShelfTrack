@@ -15,7 +15,6 @@ import {
 import {
   isGasEnabled,
   isD1Enabled,
-  getBackendUrl,
   getGasWebAppUrl,
   ensureTenant,
 } from '../../lib/gasApi';
