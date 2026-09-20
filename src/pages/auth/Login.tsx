@@ -18,7 +18,7 @@ export function Login() {
 
   const apiReady = Boolean(getD1ApiUrl());
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault: () => void }) {
     e.preventDefault();
     setError(null);
     if (!tenantId.trim() || !username.trim() || pin.length < 4) {
