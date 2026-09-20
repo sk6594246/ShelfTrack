@@ -30,30 +30,70 @@ export function Login() {
       return;
     }
     setBusy(true);
+    const tid = tenantId.trim().toLowerCase();
+    const uname = username.trim().toLowerCase();
     try {
       const base = getD1ApiUrl()!;
-      const res = await fetch(base, {
+
+      // Prefer full user login when Worker supports it
+      let data: Record<string, unknown> = {};
+      let usedLegacy = false;
+
+      const loginRes = await fetch(base, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'loginUser',
-          tenantId: tenantId.trim().toLowerCase(),
-          username: username.trim().toLowerCase(),
+          tenantId: tid,
+          username: uname,
           pin,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) {
-        throw new Error(data.error || `Login failed (${res.status})`);
+      data = (await loginRes.json().catch(() => ({}))) as Record<string, unknown>;
+
+      const errMsg = typeof data.error === 'string' ? data.error : '';
+      const needsLegacy =
+        !loginRes.ok ||
+        errMsg.includes('Unknown action') ||
+        errMsg.includes('loginUser');
+
+      if (needsLegacy) {
+        // Live Worker may only have tenant-level authTenant
+        const authRes = await fetch(base, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'authTenant',
+            tenantId: tid,
+            pin,
+          }),
+        });
+        data = (await authRes.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!authRes.ok || data.error) {
+          throw new Error(
+            typeof data.error === 'string'
+              ? data.error
+              : `Login failed (${authRes.status})`
+          );
+        }
+        usedLegacy = true;
+      } else if (data.error) {
+        throw new Error(String(data.error));
       }
+
       setSession({
-        tenantId: data.tenantId || tenantId.trim().toLowerCase(),
+        tenantId: String(data.tenantId || tid),
         pin,
-        username: data.username || username.trim().toLowerCase(),
-        userId: data.userId,
-        role: data.role || 'admin',
-        displayName: data.displayName || data.username || username,
-        tenantName: data.tenantName,
+        username: String(data.username || uname),
+        userId: String(
+          data.userId || (usedLegacy ? `tenant:${tid}:${uname}` : uname)
+        ),
+        role: String(data.role || 'admin'),
+        displayName: String(
+          data.displayName || data.username || uname
+        ),
+        tenantName:
+          typeof data.tenantName === 'string' ? data.tenantName : undefined,
       });
       navigate('/', { replace: true });
     } catch (err) {
