@@ -55,6 +55,8 @@ export function DocumentDetail() {
   const [toLocationId, setToLocationId] = useState('');
   const [qty, setQty] = useState('1');
   const [notes, setNotes] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [unitCost, setUnitCost] = useState('');
   const [purchaseDate, setPurchaseDate] = useState('');
   const [mfgDate, setMfgDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -107,6 +109,35 @@ export function DocumentDetail() {
     return allLocations;
   }, [doc, productId, allLocations]);
 
+  function onProductChange(id: string) {
+    setProductId(id);
+    const p = products.find((x) => x.id === id);
+    if (p) {
+      if (doc?.type === 'sale' && p.unitPrice != null) setUnitPrice(String(p.unitPrice));
+      if (doc?.type === 'purchase' && p.costPrice != null) setUnitCost(String(p.costPrice));
+    }
+  }
+
+  const lineTotalPreview = (() => {
+    const q = Number(qty);
+    if (!Number.isFinite(q) || q <= 0) return 0;
+    if (doc?.type === 'sale') {
+      const pr = Number(unitPrice);
+      return Number.isFinite(pr) ? q * pr : 0;
+    }
+    if (doc?.type === 'purchase') {
+      const c = Number(unitCost);
+      return Number.isFinite(c) ? q * c : 0;
+    }
+    return 0;
+  })();
+
+  const docTotal = lines.reduce((s, l) => {
+    if (doc?.type === 'sale') return s + l.quantity * (l.unitPrice ?? 0);
+    if (doc?.type === 'purchase') return s + l.quantity * (l.unitCost ?? 0);
+    return s;
+  }, 0);
+
   async function handlePost() {
     if (!doc || !isDraft) return;
     setBusy(true);
@@ -151,11 +182,21 @@ export function DocumentDetail() {
           notes: notes || undefined,
         });
       } else {
+        const priceNum = unitPrice.trim() === '' ? undefined : Number(unitPrice);
+        const costNum = unitCost.trim() === '' ? undefined : Number(unitCost);
         addLine(doc.id, {
           productId,
           quantity: qtyNum,
           locationId: locationId || undefined,
           notes: notes || undefined,
+          unitPrice:
+            doc.type === 'sale' && priceNum != null && Number.isFinite(priceNum)
+              ? priceNum
+              : undefined,
+          unitCost:
+            doc.type === 'purchase' && costNum != null && Number.isFinite(costNum)
+              ? costNum
+              : undefined,
           purchaseDate: purchaseDate || undefined,
           mfgDate: mfgDate || undefined,
           expiryDate: expiryDate || undefined,
@@ -167,6 +208,8 @@ export function DocumentDetail() {
       setToLocationId('');
       setQty('1');
       setNotes('');
+      setUnitPrice('');
+      setUnitCost('');
       reload();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not add line');
@@ -252,7 +295,14 @@ export function DocumentDetail() {
         )}
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Lines ({lines.length})</h2>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-800">Lines ({lines.length})</h2>
+            {(doc.type === 'sale' || doc.type === 'purchase') && lines.length > 0 && (
+              <p className="st-num text-sm font-bold text-slate-900">
+                Total {docTotal.toLocaleString()}
+              </p>
+            )}
+          </div>
           {lines.length === 0 ? (
             <p className="text-sm text-slate-400">No lines yet</p>
           ) : (
@@ -270,6 +320,12 @@ export function DocumentDetail() {
                       <p className="font-medium text-slate-900">{prod?.name || line.productId}</p>
                       <p className="text-xs text-slate-400">
                         qty {line.quantity}{loc ? ` · ${loc.name}` : ''}
+                        {doc.type === 'sale' && line.unitPrice != null
+                          ? ` · @ ${line.unitPrice} = ${(line.quantity * line.unitPrice).toLocaleString()}`
+                          : ''}
+                        {doc.type === 'purchase' && line.unitCost != null
+                          ? ` · @ ${line.unitCost} = ${(line.quantity * line.unitCost).toLocaleString()}`
+                          : ''}
                       </p>
                     </div>
                     {isDraft && (
@@ -287,7 +343,7 @@ export function DocumentDetail() {
         {isDraft && (
           <form onSubmit={handleAddLine} className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Add line</p>
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} required className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+            <select value={productId} onChange={(e) => onProductChange(e.target.value)} required className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
               <option value="">Product…</option>
               {productOptions.map((p) => (
                 <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
@@ -327,7 +383,7 @@ export function DocumentDetail() {
             )}
 
             <div className="space-y-2">
-              <div className="grid grid-cols-[1fr_2fr] gap-2">
+              <div className="grid grid-cols-[1fr_1fr_2fr] gap-2">
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">Qty</span>
                   <input
@@ -340,11 +396,45 @@ export function DocumentDetail() {
                     placeholder="1"
                   />
                 </label>
+                {doc.type === 'sale' && (
+                  <label className="block">
+                    <span className="text-[10px] font-semibold uppercase text-slate-400">Price</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={unitPrice}
+                      onChange={(e) => setUnitPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                      placeholder="0"
+                    />
+                  </label>
+                )}
+                {doc.type === 'purchase' && (
+                  <label className="block">
+                    <span className="text-[10px] font-semibold uppercase text-slate-400">Cost</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={unitCost}
+                      onChange={(e) => setUnitCost(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                      placeholder="0"
+                    />
+                  </label>
+                )}
+                {doc.type === 'transfer' && <div />}
                 <label className="block">
                   <span className="text-[10px] font-semibold uppercase text-slate-400">Note</span>
                   <input type="text" placeholder="Line note" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
                 </label>
               </div>
+              {(doc.type === 'sale' || doc.type === 'purchase') && lineTotalPreview > 0 && (
+                <p className="text-right text-xs font-semibold text-slate-500">
+                  Line ≈ {lineTotalPreview.toLocaleString()}
+                </p>
+              )}
               <button type="submit" className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white">
                 <Plus className="h-4 w-4" /> Add line
               </button>
