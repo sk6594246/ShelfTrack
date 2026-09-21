@@ -58,7 +58,6 @@ export function getAvailableQtyAtLocation(
     .reduce((sum, b) => sum + b.remaining, 0);
 }
 
-/** Qty at location matching product id, sku, or sourceId */
 export function getAvailableQtyForProductAtLocation(
   product: Pick<Product, 'id' | 'sku' | 'sourceId'>,
   locationId: string
@@ -79,6 +78,13 @@ export function getLocatedQtyForProductEntity(
   return getBatches()
     .filter((b) => batchBelongsToProduct(b.productId, product) && b.remaining > 0)
     .reduce((sum, b) => sum + b.remaining, 0);
+}
+
+/** Σ remaining × unitCost across all batches (true inventory value) */
+export function getInventoryValue(): number {
+  return getBatches()
+    .filter((b) => b.remaining > 0)
+    .reduce((sum, b) => sum + b.remaining * (b.unitCost ?? 0), 0);
 }
 
 export function getFifoLocationsForProduct(
@@ -126,7 +132,6 @@ export function getLocatedQtyForProduct(productId: string): number {
     .reduce((sum, b) => sum + b.remaining, 0);
 }
 
-/** Product header qty minus stock already on any location */
 export function getUnlocatedQty(productId: string, productQuantity: number): number {
   return Math.max(0, productQuantity - getLocatedQtyForProduct(productId));
 }
@@ -135,6 +140,7 @@ export function receiveBatch(input: {
   productId: string;
   locationId: string;
   quantity: number;
+  unitCost?: number;
   documentId?: string;
   documentLineId?: string;
   receivedAt?: string;
@@ -149,6 +155,10 @@ export function receiveBatch(input: {
     locationId: input.locationId,
     quantity: input.quantity,
     remaining: input.quantity,
+    unitCost:
+      input.unitCost != null && Number.isFinite(input.unitCost)
+        ? Math.max(0, input.unitCost)
+        : 0,
     receivedAt: input.receivedAt || new Date().toISOString(),
     documentId: input.documentId,
     documentLineId: input.documentLineId,
@@ -162,11 +172,12 @@ export function receiveBatch(input: {
   return batch;
 }
 
+/** FIFO issue; returns total COGS (qty × batch.unitCost) for units taken */
 export function issueFromLocation(
   productId: string,
   locationId: string,
   quantity: number
-): void {
+): { cogs: number } {
   if (quantity <= 0) throw new Error('Issue quantity must be positive');
   const available = getAvailableQtyAtLocation(productId, locationId);
   if (available < quantity) {
@@ -176,6 +187,7 @@ export function issueFromLocation(
   }
 
   let left = quantity;
+  let cogs = 0;
   const list = getBatches();
   const ordered = list
     .map((b, idx) => ({ b, idx }))
@@ -190,11 +202,13 @@ export function issueFromLocation(
   for (const { b, idx } of ordered) {
     if (left <= 0) break;
     const take = Math.min(b.remaining, left);
+    cogs += take * (b.unitCost ?? 0);
     list[idx] = { ...b, remaining: b.remaining - take };
     left -= take;
   }
 
   saveLocal(BATCHES_KEY, list);
+  return { cogs };
 }
 
 export type ExpiringBatchRow = {
@@ -245,7 +259,7 @@ export function getFefoLocationsForProduct(
   const batches = getBatchesForProduct(productId);
   const byLoc = new Map<
     string,
-    { available: number; oldestAt: string; earliestExpiry: string | null }
+    { available: number; earliestExpiry: string | null; oldestAt: string }
   >();
 
   for (const b of batches) {
