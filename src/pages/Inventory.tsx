@@ -71,7 +71,7 @@ export function Inventory() {
   const dense = density === 'dense';
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
+    <div className="st-page-fluid mx-auto w-full max-w-5xl p-4 md:p-6">
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inventory</h1>
@@ -106,7 +106,7 @@ export function Inventory() {
             placeholder="Search name, SKU, barcode, location…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+            className="st-field w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm outline-none placeholder:text-slate-400"
           />
         </div>
 
@@ -119,7 +119,7 @@ export function Inventory() {
                 key={value}
                 type="button"
                 onClick={() => setStockFilter(value)}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                className={`st-tap inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
                   active
                     ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
                     : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
@@ -162,13 +162,13 @@ export function Inventory() {
           ) : null}
         </EmptyState>
       ) : dense ? (
-        <div className="space-y-1.5">
+        <div className="st-stagger space-y-1.5">
           {filtered.map((p) => (
             <ProductCard key={p.id} product={p} dense />
           ))}
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="st-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
