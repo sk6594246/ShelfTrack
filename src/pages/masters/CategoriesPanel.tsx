@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-import type { Category } from '../../types/inventory';
+import type { Category, CategorySkuMode } from '../../types/inventory';
 import {
   getCategories,
   saveCategory,
@@ -11,6 +11,8 @@ export function CategoriesPanel() {
   const [list, setList] = useState<Category[]>([]);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [skuMode, setSkuMode] = useState<CategorySkuMode>('manual');
+  const [skuPrefix, setSkuPrefix] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +27,8 @@ export function CategoriesPanel() {
   function reset() {
     setName('');
     setNotes('');
+    setSkuMode('manual');
+    setSkuPrefix('');
     setEditingId(null);
     setError(null);
   }
@@ -33,6 +37,8 @@ export function CategoriesPanel() {
     setEditingId(c.id);
     setName(c.name);
     setNotes(c.notes || '');
+    setSkuMode(c.skuMode === 'auto' ? 'auto' : 'manual');
+    setSkuPrefix(c.skuPrefix || '');
     setError(null);
   }
 
@@ -42,8 +48,18 @@ export function CategoriesPanel() {
       setError('Name is required');
       return;
     }
+    if (skuMode === 'auto' && !skuPrefix.trim()) {
+      setError('Prefix is required when SKU mode is Auto');
+      return;
+    }
     try {
-      saveCategory({ id: editingId || undefined, name, notes: notes || undefined });
+      saveCategory({
+        id: editingId || undefined,
+        name,
+        notes: notes || undefined,
+        skuMode,
+        skuPrefix: skuMode === 'auto' ? skuPrefix : undefined,
+      });
       reset();
       reload();
     } catch (err: unknown) {
@@ -81,6 +97,56 @@ export function CategoriesPanel() {
             placeholder="Electronics"
           />
         </label>
+
+        <div className="mt-3">
+          <span className="text-xs font-semibold text-slate-500">SKU mode</span>
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSkuMode('manual')}
+              className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                skuMode === 'manual'
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => setSkuMode('auto')}
+              className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                skuMode === 'auto'
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              Auto
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Auto generates PREFIX-001, PREFIX-002… when adding a product
+          </p>
+        </div>
+
+        {skuMode === 'auto' && (
+          <label className="mt-3 block">
+            <span className="text-xs font-semibold text-slate-500">SKU prefix *</span>
+            <input
+              value={skuPrefix}
+              onChange={(e) =>
+                setSkuPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/gi, ''))
+              }
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              placeholder="CEM"
+              maxLength={12}
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Letters and digits only. Example next SKU: {skuPrefix || 'CEM'}-001
+            </p>
+          </label>
+        )}
+
         <label className="mt-3 block">
           <span className="text-xs font-semibold text-slate-500">Notes</span>
           <input
@@ -114,9 +180,19 @@ export function CategoriesPanel() {
             key={c.id}
             className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
           >
-            <div>
-              <p className={'font-semibold text-slate-900'}>{c.name}</p>
-              {c.notes && <p className={'text-xs text-slate-500'}>{c.notes}</p>}
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-900">{c.name}</p>
+              <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                SKU:{' '}
+                {c.skuMode === 'auto' ? (
+                  <span className="font-mono text-indigo-600">
+                    Auto · {c.skuPrefix || '—'}-###
+                  </span>
+                ) : (
+                  <span>Manual</span>
+                )}
+              </p>
+              {c.notes && <p className="text-xs text-slate-500">{c.notes}</p>}
             </div>
             <div className="flex gap-1">
               <button
