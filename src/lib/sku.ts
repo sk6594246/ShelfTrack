@@ -34,7 +34,7 @@ export function nextSkuForPrefix(
 ): string {
   const p = normalizeSkuPrefix(prefix);
   if (!p) throw new Error('SKU prefix is required for auto mode');
-  const re = new RegExp('^' + p + '-(\\d+)$', 'i');
+  const re = new RegExp('^' + p + '-([0-9]+)$', 'i');
   let max = 0;
   for (const prod of products) {
     const m = String(prod.sku || '').trim().match(re);
