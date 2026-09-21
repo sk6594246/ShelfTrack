@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Plus, Search } from 'lucide-react';
+import { LayoutGrid, List, Package, Plus, Search } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { ProductCard } from '../components/product/ProductCard';
 import { EmptyState } from '../components/ui/EmptyState';
+import { getCardDensity, setCardDensity, type CardDensity } from '../lib/uiPrefs';
 
 type StockFilter = 'all' | 'in' | 'low' | 'out';
 
@@ -11,6 +12,13 @@ export function Inventory() {
   const { products, loading } = useProducts();
   const [query, setQuery] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [density, setDensity] = useState<CardDensity>(() => getCardDensity());
+
+  function toggleDensity() {
+    const next: CardDensity = density === 'dense' ? 'comfortable' : 'dense';
+    setDensity(next);
+    setCardDensity(next);
+  }
 
   const counts = useMemo(() => {
     const inStock = products.filter((p) => p.quantity > p.reorderPoint).length;
@@ -21,7 +29,6 @@ export function Inventory() {
 
   const filtered = useMemo(() => {
     let list = products;
-
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
@@ -34,15 +41,9 @@ export function Inventory() {
           p.location?.toLowerCase().includes(q)
       );
     }
-
-    if (stockFilter === 'in') {
-      list = list.filter((p) => p.quantity > p.reorderPoint);
-    } else if (stockFilter === 'low') {
-      list = list.filter((p) => p.quantity > 0 && p.quantity <= p.reorderPoint);
-    } else if (stockFilter === 'out') {
-      list = list.filter((p) => p.quantity <= 0);
-    }
-
+    if (stockFilter === 'in') list = list.filter((p) => p.quantity > p.reorderPoint);
+    else if (stockFilter === 'low') list = list.filter((p) => p.quantity > 0 && p.quantity <= p.reorderPoint);
+    else if (stockFilter === 'out') list = list.filter((p) => p.quantity <= 0);
     return list;
   }, [products, query, stockFilter]);
 
@@ -67,6 +68,8 @@ export function Inventory() {
     { value: 'out', label: 'Out' },
   ];
 
+  const dense = density === 'dense';
+
   return (
     <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
       <header className="mb-6 flex items-center justify-between gap-4">
@@ -76,13 +79,23 @@ export function Inventory() {
             {products.length} product{products.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link
-          to="/products/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          Add
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleDensity}
+            className="st-tap inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700"
+          >
+            {dense ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+            {dense ? 'Comfort' : 'Dense'}
+          </button>
+          <Link
+            to="/products/new"
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add
+          </Link>
+        </div>
       </header>
 
       <div className="mb-5 space-y-3">
@@ -104,6 +117,7 @@ export function Inventory() {
             return (
               <button
                 key={value}
+                type="button"
                 onClick={() => setStockFilter(value)}
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
                   active
@@ -147,6 +161,12 @@ export function Inventory() {
             </Link>
           ) : null}
         </EmptyState>
+      ) : dense ? (
+        <div className="space-y-1.5">
+          {filtered.map((p) => (
+            <ProductCard key={p.id} product={p} dense />
+          ))}
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p) => (
