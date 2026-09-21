@@ -9,6 +9,8 @@ import {
   getLocationsCached,
   seedMastersIfEmpty,
 } from '../store/mastersStore';
+import { getCategoryByName, nextSkuForPrefix } from '../lib/sku';
+import { getProducts } from '../store/inventoryStore';
 
 type FormState = {
   name: string;
@@ -52,6 +54,8 @@ export function ProductForm() {
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [skuAuto, setSkuAuto] = useState(false);
+  const [skuBusy, setSkuBusy] = useState(false);
 
   useEffect(() => {
     seedMastersIfEmpty();
@@ -79,6 +83,7 @@ export function ProductForm() {
         reorderPoint: String(product.reorderPoint ?? 0),
         notes: product.notes ?? '',
       });
+      setSkuAuto(false);
       return;
     }
 
@@ -101,6 +106,29 @@ export function ProductForm() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function applyCategory(name: string) {
+    update('category', name);
+    if (isEdit) return;
+
+    const cat = name ? getCategoryByName(name) : undefined;
+    if (cat?.skuMode === 'auto' && cat.skuPrefix) {
+      setSkuAuto(true);
+      setSkuBusy(true);
+      try {
+        const products = await getProducts();
+        const next = nextSkuForPrefix(cat.skuPrefix, products);
+        update('sku', next);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not generate SKU');
+        setSkuAuto(false);
+      } finally {
+        setSkuBusy(false);
+      }
+    } else {
+      setSkuAuto(false);
+    }
+  }
+
   async function handleSubmit(e: { preventDefault: () => void }) {
     e.preventDefault();
     setError(null);
@@ -108,6 +136,20 @@ export function ProductForm() {
     if (!form.name.trim() || !form.sku.trim()) {
       setError('Name and SKU are required');
       return;
+    }
+
+    try {
+      const products = await getProducts();
+      const skuNorm = form.sku.trim().toLowerCase();
+      const clash = products.find(
+        (p) => p.sku.trim().toLowerCase() === skuNorm && (!isEdit || p.id !== id)
+      );
+      if (clash) {
+        setError('SKU "' + form.sku.trim() + '" already used by ' + clash.name);
+        return;
+      }
+    } catch {
+      /* non-fatal */
     }
 
     setSaving(true);
@@ -156,6 +198,10 @@ export function ProductForm() {
     return names;
   })();
 
+  const selectedCat = form.category ? getCategoryByName(form.category) : undefined;
+  const showAutoHint =
+    !isEdit && selectedCat?.skuMode === 'auto' && !!selectedCat.skuPrefix;
+
   return (
     <div className="mx-auto w-full max-w-lg p-4 md:p-6">
       <header className="mb-6 flex items-center gap-3">
@@ -197,39 +243,10 @@ export function ProductForm() {
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="SKU *">
-            <input
-              value={form.sku}
-              onChange={(e) => update('sku', e.target.value)}
-              className="input"
-              placeholder="SKU-001"
-              required
-            />
-          </Field>
-          <Field label="Barcode">
-            <input
-              value={form.barcode}
-              onChange={(e) => update('barcode', e.target.value)}
-              className="input"
-              placeholder="Optional"
-            />
-          </Field>
-        </div>
-
-        <Field label="Custom ID">
-          <input
-            value={form.customId}
-            onChange={(e) => update('customId', e.target.value)}
-            className="input"
-            placeholder="Internal ID"
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
           <Field label="Category">
             <select
               value={form.category}
-              onChange={(e) => update('category', e.target.value)}
+              onChange={(e) => void applyCategory(e.target.value)}
               className="input"
             >
               <option value="">Select category</option>
@@ -265,6 +282,53 @@ export function ProductForm() {
             )}
           </Field>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="SKU *">
+            <input
+              value={form.sku}
+              onChange={(e) => {
+                if (!isEdit && !skuAuto) update('sku', e.target.value);
+              }}
+              className="input font-mono"
+              placeholder={showAutoHint ? 'Auto…' : 'SKU-001'}
+              required
+              readOnly={isEdit || skuAuto}
+              style={
+                skuAuto && !isEdit
+                  ? { background: '#f8fafc', color: '#4f46e5' }
+                  : undefined
+              }
+            />
+            {showAutoHint && (
+              <p className="mt-1 text-[11px] text-indigo-600">
+                {skuBusy
+                  ? 'Generating…'
+                  : 'Auto from ' + (selectedCat?.skuPrefix || '') + '-### (read-only)'}
+              </p>
+            )}
+            {isEdit && (
+              <p className="mt-1 text-[11px] text-slate-400">SKU locked on edit</p>
+            )}
+          </Field>
+          <Field label="Barcode">
+            <input
+              value={form.barcode}
+              onChange={(e) => update('barcode', e.target.value)}
+              className="input"
+              placeholder="Optional"
+            />
+          </Field>
+        </div>
+
+        <Field label="Custom ID">
+          <input
+            value={form.customId}
+            onChange={(e) => update('customId', e.target.value)}
+            className="input"
+            placeholder="Internal ID"
+          />
+        </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Quantity">
@@ -306,7 +370,7 @@ export function ProductForm() {
 
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || skuBusy}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
         >
           <Save className="h-4 w-4" />
