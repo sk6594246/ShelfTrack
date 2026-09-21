@@ -92,10 +92,16 @@ export const DEFAULT_STORE_LAYOUT: StoreLayout = {
   cols: 8,
 };
 
+export type CategorySkuMode = 'manual' | 'auto';
+
 export interface Category {
   id: string;
   name: string;
   notes?: string;
+  /** Manual = type SKU on product; Auto = PREFIX-NNN from skuPrefix */
+  skuMode?: CategorySkuMode;
+  /** Uppercase letters/digits used when skuMode is auto (e.g. CEM) */
+  skuPrefix?: string;
   createdAt: string;
   updatedAt: string;
 }
