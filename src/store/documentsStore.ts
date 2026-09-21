@@ -14,6 +14,7 @@ import {
   getBatches,
 } from './stockBatchStore';
 import { getLocationById, getWeightageForProductAtLocation } from './mastersStore';
+import { recordSaleProfit } from '../lib/valueMetrics';
 
 const DOCS_KEY = 'inventory_documents';
 const LINES_KEY = 'inventory_document_lines';
@@ -114,6 +115,8 @@ export type AddLineInput = {
   fromLocationId?: string;
   toLocationId?: string;
   notes?: string;
+  unitPrice?: number;
+  unitCost?: number;
   purchaseDate?: string;
   mfgDate?: string;
   expiryDate?: string;
@@ -176,6 +179,14 @@ export function addLine(documentId: string, input: AddLineInput): DocumentLine {
     fromLocationId: input.fromLocationId,
     toLocationId: input.toLocationId,
     notes: input.notes?.trim() || undefined,
+    unitPrice:
+      input.unitPrice != null && Number.isFinite(input.unitPrice)
+        ? Math.max(0, input.unitPrice)
+        : undefined,
+    unitCost:
+      input.unitCost != null && Number.isFinite(input.unitCost)
+        ? Math.max(0, input.unitCost)
+        : undefined,
     purchaseDate: input.purchaseDate || undefined,
     mfgDate: input.mfgDate || undefined,
     expiryDate: input.expiryDate || undefined,
@@ -199,7 +210,6 @@ export function removeLine(lineId: string): void {
   );
 }
 
-/** Effective space used at location: sum(remaining * weightage) */
 function totalEffectiveSpaceAtLocation(locationId: string): number {
   return getBatches()
     .filter((b) => b.locationId === locationId && b.remaining > 0)
@@ -255,7 +265,6 @@ function validateLinesForPost(doc: InventoryDocument, lines: DocumentLine[]) {
     }
   }
 
-  // Capacity check uses weightage: effectiveSpace = qty * weightage
   if (doc.type === 'purchase' || doc.type === 'transfer') {
     const inboundEffective = new Map<string, number>();
     for (const line of lines) {
@@ -288,6 +297,9 @@ async function applyPostEffects(
   lines: DocumentLine[],
   direction: 1 | -1
 ) {
+  let saleRevenue = 0;
+  let saleCogs = 0;
+
   for (const line of lines) {
     const product = await resolveProduct(line.productId);
     if (!product) {
@@ -302,12 +314,14 @@ async function applyPostEffects(
         direction === 1
           ? `Purchase ${doc.id.slice(0, 8)}`
           : `Reverse purchase ${doc.id.slice(0, 8)}`;
+      const unitCost = line.unitCost ?? product.costPrice ?? 0;
       if (direction === 1) {
         await adjustStock(product.id, change, reason);
         receiveBatch({
           productId: product.id,
           locationId: line.locationId!,
           quantity: line.quantity,
+          unitCost,
           documentId: doc.id,
           documentLineId: line.id,
           purchaseDate: line.purchaseDate,
@@ -324,15 +338,32 @@ async function applyPostEffects(
         direction === 1
           ? `Sale ${doc.id.slice(0, 8)}`
           : `Reverse sale ${doc.id.slice(0, 8)}`;
+      const unitPrice = line.unitPrice ?? product.unitPrice ?? 0;
       if (direction === 1) {
-        issueFromLocation(product.id, line.locationId!, line.quantity);
+        const { cogs } = issueFromLocation(
+          product.id,
+          line.locationId!,
+          line.quantity
+        );
         await adjustStock(product.id, change, reason);
+        saleRevenue += line.quantity * unitPrice;
+        saleCogs += cogs;
+        const allLines = loadLocal<DocumentLine[]>(LINES_KEY, []);
+        const li = allLines.findIndex((l) => l.id === line.id);
+        if (li >= 0) {
+          allLines[li] = { ...allLines[li], cogsTotal: cogs, unitPrice };
+          saveLocal(LINES_KEY, allLines);
+        }
       } else {
         await adjustStock(product.id, change, reason);
         receiveBatch({
           productId: product.id,
           locationId: line.locationId!,
           quantity: line.quantity,
+          unitCost:
+            line.cogsTotal != null && line.quantity > 0
+              ? line.cogsTotal / line.quantity
+              : line.unitCost ?? product.costPrice ?? 0,
           documentId: doc.id,
           documentLineId: line.id,
         });
@@ -340,13 +371,20 @@ async function applyPostEffects(
     } else if (doc.type === 'transfer') {
       const fromUnlocated = line.fromLocationId === UNLOCATED_LOCATION_ID;
       if (direction === 1) {
+        let unitCost = line.unitCost ?? product.costPrice ?? 0;
         if (!fromUnlocated) {
-          issueFromLocation(product.id, line.fromLocationId!, line.quantity);
+          const { cogs } = issueFromLocation(
+            product.id,
+            line.fromLocationId!,
+            line.quantity
+          );
+          unitCost = line.quantity > 0 ? cogs / line.quantity : 0;
         }
         receiveBatch({
           productId: product.id,
           locationId: line.toLocationId!,
           quantity: line.quantity,
+          unitCost,
           documentId: doc.id,
           documentLineId: line.id,
           purchaseDate: line.purchaseDate,
@@ -354,12 +392,17 @@ async function applyPostEffects(
           expiryDate: line.expiryDate,
         });
       } else {
-        issueFromLocation(product.id, line.toLocationId!, line.quantity);
+        const { cogs } = issueFromLocation(
+          product.id,
+          line.toLocationId!,
+          line.quantity
+        );
         if (!fromUnlocated) {
           receiveBatch({
             productId: product.id,
             locationId: line.fromLocationId!,
             quantity: line.quantity,
+            unitCost: line.quantity > 0 ? cogs / line.quantity : 0,
             documentId: doc.id,
             documentLineId: line.id,
             purchaseDate: line.purchaseDate,
@@ -369,6 +412,15 @@ async function applyPostEffects(
         }
       }
     }
+  }
+
+  if (doc.type === 'sale' && direction === 1 && (saleRevenue > 0 || saleCogs > 0)) {
+    recordSaleProfit({
+      documentId: doc.id,
+      revenue: saleRevenue,
+      cogs: saleCogs,
+      postedAt: new Date().toISOString(),
+    });
   }
 }
 
