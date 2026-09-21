@@ -143,10 +143,9 @@ export function addLine(documentId: string, input: AddLineInput): DocumentLine {
     const existing = getLines(documentId)
       .filter((l) => l.productId === input.productId && l.locationId === input.locationId)
       .reduce((s, l) => s + l.quantity, 0);
+    const remaining = Math.max(0, available - existing);
     if (existing + input.quantity > available) {
-      throw new Error(
-        `Only ${available} available at this location (already ${existing} on other lines). Cannot add ${input.quantity}.`
-      );
+      throw new Error(`Only ${remaining} available`);
     }
   }
   if (
@@ -162,10 +161,9 @@ export function addLine(documentId: string, input: AddLineInput): DocumentLine {
           l.fromLocationId === input.fromLocationId
       )
       .reduce((s, l) => s + l.quantity, 0);
+    const remaining = Math.max(0, available - existing);
     if (existing + input.quantity > available) {
-      throw new Error(
-        `Only ${available} available at source location (already ${existing} on other lines). Cannot add ${input.quantity}.`
-      );
+      throw new Error(`Only ${remaining} available`);
     }
   }
 
