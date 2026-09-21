@@ -6,16 +6,53 @@ import { StatusBadge } from '../ui/StatusBadge';
 interface ProductCardProps {
   product: Product;
   compact?: boolean;
+  dense?: boolean;
 }
 
-export function ProductCard({ product, compact = false }: ProductCardProps) {
+export function ProductCard({ product, compact = false, dense = false }: ProductCardProps) {
   const isOut = product.quantity <= 0;
   const isLow = product.quantity > 0 && product.quantity <= product.reorderPoint;
+
+  if (dense) {
+    return (
+      <Link
+        to={`/products/${product.id}`}
+        className="st-tap group flex items-center gap-3 rounded-xl border px-3 py-2.5 transition"
+        style={{ background: 'var(--st-surface)', borderColor: 'var(--st-border)' }}
+      >
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+          style={{
+            background: isOut
+              ? 'color-mix(in srgb, var(--st-danger) 12%, transparent)'
+              : isLow
+                ? 'color-mix(in srgb, var(--st-warning) 15%, transparent)'
+                : 'var(--st-primary-soft)',
+            color: isOut ? 'var(--st-danger)' : isLow ? 'var(--st-warning)' : 'var(--st-primary)',
+          }}
+        >
+          <Package className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold" style={{ color: 'var(--st-text)' }}>{product.name}</p>
+          <p className="truncate font-mono text-[10px]" style={{ color: 'var(--st-muted)' }}>
+            {product.sku}{product.location ? ` · ${product.location}` : ''}
+          </p>
+        </div>
+        <span
+          className="st-num shrink-0 text-lg font-bold"
+          style={{ color: isOut ? 'var(--st-danger)' : isLow ? 'var(--st-warning)' : 'var(--st-text)' }}
+        >
+          {product.quantity}
+        </span>
+      </Link>
+    );
+  }
 
   return (
     <Link
       to={`/products/${product.id}`}
-      className="group block rounded-2xl border p-4 shadow-sm transition-all duration-200 active:scale-[0.99]"
+      className="st-tap group block rounded-2xl border p-4 shadow-sm transition-all duration-200"
       style={{
         background: 'var(--st-surface)',
         borderColor: 'var(--st-border)',
