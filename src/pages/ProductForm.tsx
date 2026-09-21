@@ -21,6 +21,8 @@ type FormState = {
   location: string;
   quantity: string;
   reorderPoint: string;
+  unitPrice: string;
+  costPrice: string;
   notes: string;
 };
 
@@ -33,6 +35,8 @@ const emptyForm: FormState = {
   location: '',
   quantity: '0',
   reorderPoint: '5',
+  unitPrice: '',
+  costPrice: '',
   notes: '',
 };
 
@@ -81,6 +85,8 @@ export function ProductForm() {
         location: product.location ?? '',
         quantity: String(product.quantity ?? 0),
         reorderPoint: String(product.reorderPoint ?? 0),
+        unitPrice: product.unitPrice != null ? String(product.unitPrice) : '',
+        costPrice: product.costPrice != null ? String(product.costPrice) : '',
         notes: product.notes ?? '',
       });
       setSkuAuto(false);
@@ -154,6 +160,8 @@ export function ProductForm() {
 
     setSaving(true);
     try {
+      const up = form.unitPrice.trim() === '' ? undefined : Number(form.unitPrice);
+      const cp = form.costPrice.trim() === '' ? undefined : Number(form.costPrice);
       const saved = await createOrUpdate({
         id: isEdit ? id : undefined,
         name: form.name.trim(),
@@ -164,6 +172,8 @@ export function ProductForm() {
         location: form.location.trim() || undefined,
         quantity: parseQty(form.quantity),
         reorderPoint: parseQty(form.reorderPoint),
+        unitPrice: up != null && Number.isFinite(up) ? up : undefined,
+        costPrice: cp != null && Number.isFinite(cp) ? cp : undefined,
         notes: form.notes.trim() || undefined,
       });
       navigate(`/products/${saved.id}`, { replace: true });
@@ -358,6 +368,38 @@ export function ProductForm() {
             />
           </Field>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Sell price">
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={form.unitPrice}
+              onChange={(e) =>
+                update('unitPrice', e.target.value.replace(/[^0-9.]/g, ''))
+              }
+              className="input"
+              placeholder="Default on sales"
+            />
+          </Field>
+          <Field label="Cost price">
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={form.costPrice}
+              onChange={(e) =>
+                update('costPrice', e.target.value.replace(/[^0-9.]/g, ''))
+              }
+              className="input"
+              placeholder="Default on purchase"
+            />
+          </Field>
+        </div>
+        <p className="text-[11px] text-slate-400">
+          Defaults only. Each purchase batch keeps its own cost (e.g. 20 then 21).
+        </p>
 
         <Field label="Notes">
           <textarea
