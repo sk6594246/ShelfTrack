@@ -83,7 +83,7 @@ export function Dashboard() {
   const hasAnyData = products.length > 0 || locations.length > 0 || openDocs > 0;
 
   return (
-    <div className="mx-auto w-full max-w-lg p-4 pb-8 st-page">
+    <div className="st-page-fluid mx-auto w-full max-w-lg p-4 pb-8 st-page">
       <header className="mb-4">
         <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--st-text)' }}>
           Shift board
@@ -101,7 +101,7 @@ export function Dashboard() {
           <Link
             key={a.label}
             to={a.to}
-            className="flex flex-col items-center gap-0.5 px-1 py-2.5 text-center transition active:opacity-80"
+            className="st-tap flex flex-col items-center gap-0.5 px-1 py-2.5 text-center"
             style={{ background: 'var(--st-surface)' }}
           >
             <span
@@ -117,12 +117,12 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="st-stagger grid grid-cols-2 gap-3">
         {tiles.map((t) => (
           <Link
             key={t.to}
             to={t.to}
-            className="st-tap st-enter flex flex-col items-start gap-3 rounded-2xl border p-4 transition active:scale-[0.98]"
+            className="st-tap st-tile-press st-enter flex flex-col items-start gap-3 rounded-2xl border p-4"
             style={{
               background: 'var(--st-surface)',
               borderColor: 'var(--st-border)',
@@ -150,7 +150,7 @@ export function Dashboard() {
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           to="/inventory"
-          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
+          className="st-tap inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
           style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
         >
           <Package className="h-3.5 w-3.5" style={{ color: 'var(--st-primary)' }} />
@@ -158,14 +158,14 @@ export function Dashboard() {
         </Link>
         <Link
           to="/documents"
-          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
+          className="st-tap inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
           style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
         >
           Documents
         </Link>
         <Link
           to="/masters"
-          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
+          className="st-tap inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
           style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
         >
           Masters
