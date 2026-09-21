@@ -35,7 +35,7 @@ export function EmptyState({
 
   return (
     <div
-      className="rounded-2xl border border-dashed px-6 py-12 text-center shadow-sm"
+      className="st-morph rounded-2xl border border-dashed px-6 py-12 text-center shadow-sm"
       style={{
         background: 'var(--st-surface)',
         borderColor: 'var(--st-border)',
