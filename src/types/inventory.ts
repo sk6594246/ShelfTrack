@@ -19,6 +19,10 @@ export interface Product {
   reorderPoint: number;
   notes?: string;
   imageUrl?: string;
+  /** Default selling price (document can override) */
+  unitPrice?: number;
+  /** Default purchase/cost hint (batch carries actual cost) */
+  costPrice?: number;
   /** Original backend / GAS id when client id was normalized from SKU */
   sourceId?: string;
   createdAt: string;
@@ -70,13 +74,9 @@ export interface Location {
   name: string;
   code?: string;
   notes?: string;
-  /** 1-based grid row on store map */
   gridRow?: number;
-  /** 1-based grid column on store map */
   gridCol?: number;
-  /** Shelf level within cell (1 = bottom/first, 2 = second, …) */
   shelf?: number;
-  /** Max total units allowed at this location (bin capacity). Empty = unlimited */
   maxQty?: number;
   createdAt: string;
   updatedAt: string;
@@ -98,9 +98,7 @@ export interface Category {
   id: string;
   name: string;
   notes?: string;
-  /** Manual = type SKU on product; Auto = PREFIX-NNN from skuPrefix */
   skuMode?: CategorySkuMode;
-  /** Uppercase letters/digits used when skuMode is auto (e.g. CEM) */
   skuPrefix?: string;
   createdAt: string;
   updatedAt: string;
@@ -123,7 +121,6 @@ export interface BusinessPartner {
 export interface LocationProduct {
   locationId: string;
   productId: string;
-  /** Relative space factor for one unit of this product at the location (default 1) */
   weightage?: number;
 }
 
@@ -163,11 +160,8 @@ export interface InventoryDocument {
   updatedAt: string;
   postedAt?: string;
   reversedAt?: string;
-  /** This doc reverses another (set on the reversal record) */
   reversesDocumentId?: string;
-  /** Id of the document that reversed this one (set on the original) */
   reversedByDocumentId?: string;
-  /** @deprecated use reversesDocumentId */
   reversedFromId?: string;
 }
 
@@ -180,7 +174,12 @@ export interface DocumentLine {
   fromLocationId?: string;
   toLocationId?: string;
   notes?: string;
-  /** ISO date YYYY-MM-DD */
+  /** Selling unit price (sale docs) */
+  unitPrice?: number;
+  /** Purchase unit cost — flows into batch.unitCost */
+  unitCost?: number;
+  /** Set at post for sales: total COGS from batches issued */
+  cogsTotal?: number;
   purchaseDate?: string;
   mfgDate?: string;
   expiryDate?: string;
@@ -194,10 +193,20 @@ export interface StockBatch {
   locationId: string;
   quantity: number;
   remaining: number;
+  /** Cost per unit for this receipt (rides with stock) */
+  unitCost?: number;
   receivedAt: string;
   documentId?: string;
   documentLineId?: string;
   purchaseDate?: string;
   mfgDate?: string;
   expiryDate?: string;
+}
+
+/** Daily profit snapshot for trend */
+export interface ProfitDay {
+  date: string;
+  revenue: number;
+  cogs: number;
+  profit: number;
 }
