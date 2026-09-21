@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
   Package,
@@ -48,7 +48,10 @@ export function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [quickReceive, setQuickReceive] = useState(false);
   const [showSplash, setShowSplash] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationKey = location.pathname;
   const session = getSession();
   const role = (session?.role || 'worker').toLowerCase();
   const company = session?.tenantName || session?.tenantId || 'ShelfTrack';
@@ -71,6 +74,16 @@ export function AppShell() {
   useEffect(() => {
     document.documentElement.setAttribute('data-role', role);
   }, [role]);
+
+  useEffect(() => {
+    const main = document.querySelector('main.st-main-scroll');
+    if (!main) return;
+    function onScroll() {
+      setHeaderScrolled((main as HTMLElement).scrollTop > 12);
+    }
+    main.addEventListener('scroll', onScroll, { passive: true });
+    return () => main.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (!isGasEnabled()) return;
@@ -132,13 +145,14 @@ export function AppShell() {
       )}
 
       <header
-        className="sticky top-0 z-30 flex items-center gap-2 border-b px-3 py-2.5 backdrop-blur-md"
+        className="st-header sticky top-0 z-30 flex items-center gap-2 border-b px-3 py-2.5 backdrop-blur-md"
+        data-scrolled={headerScrolled ? 'true' : 'false'}
         style={{
           background: 'color-mix(in srgb, var(--st-nav) 92%, transparent)',
           borderColor: 'var(--st-border)',
         }}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="st-header-brand flex min-w-0 flex-1 items-center gap-2">
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white"
             style={{ background: 'var(--st-primary)' }}
@@ -192,8 +206,10 @@ export function AppShell() {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-28">
-        <Outlet />
+      <main className="st-main-scroll flex-1 overflow-y-auto pb-28">
+        <div className="st-page-fluid" key={locationKey}>
+          <Outlet />
+        </div>
       </main>
 
       <button
@@ -216,21 +232,22 @@ export function AppShell() {
               key={to}
               to={to}
               end={end}
-              className="relative flex min-h-[52px] min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-bold transition"
+              className="st-nav-item relative flex min-h-[52px] min-w-[56px] flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[11px] font-bold"
               style={{ color: 'var(--st-muted)' }}
             >
               {({ isActive }) => (
                 <span
                   className="flex flex-col items-center gap-0.5"
+                  data-active={isActive ? 'true' : 'false'}
                   style={{ color: isActive ? 'var(--st-primary)' : 'var(--st-muted)' }}
                 >
                   {isActive && (
                     <span
-                      className="absolute top-0 h-1 w-8 rounded-full"
+                      className="st-nav-indicator absolute top-0 h-1 w-8 rounded-full"
                       style={{ background: 'var(--st-primary)' }}
                     />
                   )}
-                  <Icon className="h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
+                  <Icon className="st-nav-icon h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
                   {label}
                 </span>
               )}
@@ -241,12 +258,12 @@ export function AppShell() {
 
       {opsOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
+          className="st-sheet-backdrop fixed inset-0 z-50 flex items-end justify-center"
           style={{ background: 'var(--st-overlay)' }}
           onClick={() => setOpsOpen(false)}
         >
           <div
-            className="st-enter w-full max-w-lg rounded-t-3xl border-t p-4 pb-8 shadow-xl"
+            className="st-sheet w-full max-w-lg rounded-t-3xl border-t p-4 pb-8 shadow-xl"
             style={{ background: 'var(--st-surface)', borderColor: 'var(--st-border)' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -315,7 +332,7 @@ export function AppShell() {
                   key={item.label}
                   type="button"
                   onClick={item.onClick}
-                  className="st-tap flex items-center gap-3 rounded-2xl border p-3 text-left"
+                  className="st-tap st-tile-press flex items-center gap-3 rounded-2xl border p-3 text-left"
                   style={{
                     borderColor: 'var(--st-border)',
                     background: 'var(--st-surface-2)',
@@ -344,12 +361,12 @@ export function AppShell() {
 
       {moreOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
+          className="st-sheet-backdrop fixed inset-0 z-50 flex items-end justify-center"
           style={{ background: 'var(--st-overlay)' }}
           onClick={() => setMoreOpen(false)}
         >
           <div
-            className="st-enter w-full max-w-lg rounded-t-3xl border-t p-4 pb-8"
+            className="st-sheet w-full max-w-lg rounded-t-3xl border-t p-4 pb-8"
             style={{ background: 'var(--st-surface)', borderColor: 'var(--st-border)' }}
             onClick={(e) => e.stopPropagation()}
           >
