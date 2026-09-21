@@ -10,6 +10,10 @@ import {
   TrendingUp,
   Wallet,
   ShoppingBag,
+  Percent,
+  Clock,
+  CalendarClock,
+  FileStack,
 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { getLocations } from '../store/mastersStore';
@@ -18,13 +22,17 @@ import { getDocuments } from '../store/documentsStore';
 import { EmptyState } from '../components/ui/EmptyState';
 import {
   formatMoney,
+  formatPct,
   getProfitTrend,
   getValueSnapshot,
+  getOpsKpiSnapshot,
 } from '../lib/valueMetrics';
 
 export function Dashboard() {
   const { products, loading } = useProducts();
-  const [locations, setLocations] = useState<import('../types/inventory').Location[]>([]);
+  const [locations, setLocations] = useState<
+    import('../types/inventory').Location[]
+  >([]);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -66,13 +74,24 @@ export function Dashboard() {
   const expiring = useMemo(() => getExpiringBatches(30).length, [products, tick]);
 
   const values = useMemo(() => getValueSnapshot(), [products, tick]);
+  const ops = useMemo(() => getOpsKpiSnapshot(products), [products, tick]);
   const trend = useMemo(() => getProfitTrend(7), [products, tick]);
   const maxProfit = Math.max(1, ...trend.map((d) => Math.abs(d.profit)));
 
   const alerts: { label: string; value: number; to: string; warn: boolean }[] = [
     { label: 'Open drafts', value: openDocs, to: '/documents', warn: openDocs > 0 },
-    { label: 'Low stock', value: lowStock.length, to: '/inventory', warn: lowStock.length > 0 },
-    { label: 'Out of stock', value: outOfStock.length, to: '/inventory', warn: outOfStock.length > 0 },
+    {
+      label: 'Low stock',
+      value: lowStock.length,
+      to: '/inventory',
+      warn: lowStock.length > 0,
+    },
+    {
+      label: 'Out of stock',
+      value: outOfStock.length,
+      to: '/inventory',
+      warn: outOfStock.length > 0,
+    },
     { label: 'Expiring 30d', value: expiring, to: '/stock', warn: expiring > 0 },
   ];
 
@@ -98,11 +117,22 @@ export function Dashboard() {
   }
 
   const hasAnyData = products.length > 0 || locations.length > 0 || openDocs > 0;
+  const coverLabel =
+    ops.daysOfCover == null
+      ? '—'
+      : ops.daysOfCover >= 100
+        ? '99+'
+        : ops.daysOfCover < 10
+          ? ops.daysOfCover.toFixed(1)
+          : String(Math.round(ops.daysOfCover));
 
   return (
     <div className="st-page-fluid mx-auto w-full max-w-lg p-4 pb-8 st-page">
       <header className="mb-4">
-        <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--st-text)' }}>
+        <h1
+          className="text-xl font-bold tracking-tight"
+          style={{ color: 'var(--st-text)' }}
+        >
           Shift board
         </h1>
         <p className="mt-0.5 text-sm" style={{ color: 'var(--st-muted)' }}>
@@ -110,14 +140,18 @@ export function Dashboard() {
         </p>
       </header>
 
+      {/* Value / profit strip */}
       <div
-        className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border p-3"
+        className="mb-3 grid grid-cols-3 gap-2 rounded-2xl border p-3"
         style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
       >
         <div className="min-w-0 text-center">
           <div
             className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+            style={{
+              background: 'var(--st-primary-soft)',
+              color: 'var(--st-primary)',
+            }}
           >
             <Wallet className="h-3.5 w-3.5" />
           </div>
@@ -131,7 +165,10 @@ export function Dashboard() {
         <div className="min-w-0 text-center">
           <div
             className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+            style={{
+              background: 'var(--st-primary-soft)',
+              color: 'var(--st-primary)',
+            }}
           >
             <ShoppingBag className="h-3.5 w-3.5" />
           </div>
@@ -145,14 +182,18 @@ export function Dashboard() {
         <div className="min-w-0 text-center">
           <div
             className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
-            style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+            style={{
+              background: 'var(--st-primary-soft)',
+              color: 'var(--st-primary)',
+            }}
           >
             <TrendingUp className="h-3.5 w-3.5" />
           </div>
           <p
             className="st-num text-sm font-bold"
             style={{
-              color: values.profit >= 0 ? 'var(--st-success)' : 'var(--st-danger)',
+              color:
+                values.profit >= 0 ? 'var(--st-success)' : 'var(--st-danger)',
             }}
           >
             {formatMoney(values.profit)}
@@ -163,6 +204,156 @@ export function Dashboard() {
         </div>
       </div>
 
+      {/* Ops KPIs: margin · cover · dead · expiry ₹ */}
+      <div
+        className="mb-3 grid grid-cols-4 gap-2 rounded-2xl border p-2.5"
+        style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
+      >
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
+            style={{
+              background: 'var(--st-primary-soft)',
+              color: 'var(--st-primary)',
+            }}
+          >
+            <Percent className="h-3 w-3" />
+          </div>
+          <p
+            className="st-num text-sm font-bold leading-tight"
+            style={{
+              color:
+                ops.marginPct >= 0 ? 'var(--st-success)' : 'var(--st-danger)',
+            }}
+          >
+            {formatPct(ops.marginPct)}
+          </p>
+          <p className="text-[9px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Margin
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
+            style={{
+              background: 'var(--st-primary-soft)',
+              color: 'var(--st-primary)',
+            }}
+          >
+            <Clock className="h-3 w-3" />
+          </div>
+          <p className="st-num text-sm font-bold leading-tight" style={{ color: 'var(--st-text)' }}>
+            {coverLabel}
+            {ops.daysOfCover != null && (
+              <span className="text-[9px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+                {' '}
+                d
+              </span>
+            )}
+          </p>
+          <p className="text-[9px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Cover
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
+            style={{
+              background:
+                ops.deadStockCount > 0
+                  ? 'color-mix(in srgb, var(--st-warning) 18%, transparent)'
+                  : 'var(--st-primary-soft)',
+              color:
+                ops.deadStockCount > 0 ? 'var(--st-warning)' : 'var(--st-primary)',
+            }}
+          >
+            <Package className="h-3 w-3" />
+          </div>
+          <p
+            className="st-num text-sm font-bold leading-tight"
+            style={{
+              color:
+                ops.deadStockCount > 0 ? 'var(--st-warning)' : 'var(--st-text)',
+            }}
+          >
+            {ops.deadStockCount}
+          </p>
+          <p className="text-[9px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Dead 30d
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
+            style={{
+              background:
+                ops.expiryRiskValue > 0
+                  ? 'color-mix(in srgb, var(--st-danger) 15%, transparent)'
+                  : 'var(--st-primary-soft)',
+              color:
+                ops.expiryRiskValue > 0 ? 'var(--st-danger)' : 'var(--st-primary)',
+            }}
+          >
+            <CalendarClock className="h-3 w-3" />
+          </div>
+          <p
+            className="st-num text-sm font-bold leading-tight"
+            style={{
+              color:
+                ops.expiryRiskValue > 0 ? 'var(--st-danger)' : 'var(--st-text)',
+            }}
+          >
+            {formatMoney(ops.expiryRiskValue)}
+          </p>
+          <p className="text-[9px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Expiry ₹
+          </p>
+        </div>
+      </div>
+
+      {/* Open drafts by type */}
+      {ops.drafts.total > 0 && (
+        <div
+          className="mb-3 flex items-center gap-2 overflow-x-auto rounded-2xl border px-3 py-2"
+          style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
+        >
+          <FileStack
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: 'var(--st-primary)' }}
+          />
+          <span
+            className="shrink-0 text-[10px] font-bold uppercase tracking-wide"
+            style={{ color: 'var(--st-muted)' }}
+          >
+            Drafts
+          </span>
+          {(
+            [
+              ['PO', ops.drafts.purchase, 'purchase'],
+              ['SO', ops.drafts.sale, 'sale'],
+              ['TR', ops.drafts.transfer, 'transfer'],
+              ['ADJ', ops.drafts.adjust, 'adjust'],
+            ] as const
+          )
+            .filter(([, n]) => n > 0)
+            .map(([label, n]) => (
+              <Link
+                key={label}
+                to="/documents"
+                className="st-tap shrink-0 rounded-lg px-2 py-1 text-xs font-semibold"
+                style={{
+                  background: 'var(--st-primary-soft)',
+                  color: 'var(--st-primary)',
+                }}
+              >
+                {label}{' '}
+                <span className="st-num font-bold">{n}</span>
+              </Link>
+            ))}
+        </div>
+      )}
+
+      {/* 7-day profit trend */}
       <div
         className="mb-4 rounded-2xl border p-3"
         style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
@@ -214,7 +405,10 @@ export function Dashboard() {
             >
               {a.value}
             </span>
-            <span className="text-[10px] font-semibold leading-tight" style={{ color: 'var(--st-muted)' }}>
+            <span
+              className="text-[10px] font-semibold leading-tight"
+              style={{ color: 'var(--st-muted)' }}
+            >
               {a.label}
             </span>
           </Link>
@@ -255,7 +449,11 @@ export function Dashboard() {
         <Link
           to="/inventory"
           className="st-tap inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
-          style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
+          style={{
+            borderColor: 'var(--st-border)',
+            color: 'var(--st-text)',
+            background: 'var(--st-surface)',
+          }}
         >
           <Package className="h-3.5 w-3.5" style={{ color: 'var(--st-primary)' }} />
           Inventory
@@ -263,14 +461,22 @@ export function Dashboard() {
         <Link
           to="/documents"
           className="st-tap inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
-          style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
+          style={{
+            borderColor: 'var(--st-border)',
+            color: 'var(--st-text)',
+            background: 'var(--st-surface)',
+          }}
         >
           Documents
         </Link>
         <Link
           to="/masters"
           className="st-tap inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold"
-          style={{ borderColor: 'var(--st-border)', color: 'var(--st-text)', background: 'var(--st-surface)' }}
+          style={{
+            borderColor: 'var(--st-border)',
+            color: 'var(--st-text)',
+            background: 'var(--st-surface)',
+          }}
         >
           Masters
         </Link>
@@ -325,7 +531,8 @@ export function Dashboard() {
                   <span
                     className="st-num shrink-0 font-bold"
                     style={{
-                      color: p.quantity <= 0 ? 'var(--st-danger)' : 'var(--st-warning)',
+                      color:
+                        p.quantity <= 0 ? 'var(--st-danger)' : 'var(--st-warning)',
                     }}
                   >
                     {p.quantity}
