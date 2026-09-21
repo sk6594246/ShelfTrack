@@ -7,16 +7,25 @@ import {
   QrCode,
   Truck,
   ClipboardList,
+  TrendingUp,
+  Wallet,
+  ShoppingBag,
 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { getLocations } from '../store/mastersStore';
 import { getExpiringBatches } from '../store/stockBatchStore';
 import { getDocuments } from '../store/documentsStore';
 import { EmptyState } from '../components/ui/EmptyState';
+import {
+  formatMoney,
+  getProfitTrend,
+  getValueSnapshot,
+} from '../lib/valueMetrics';
 
 export function Dashboard() {
   const { products, loading } = useProducts();
   const [locations, setLocations] = useState<import('../types/inventory').Location[]>([]);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +50,10 @@ export function Dashboard() {
     };
   }, [products]);
 
+  useEffect(() => {
+    setTick((t) => t + 1);
+  }, [products]);
+
   const lowStock = useMemo(
     () => products.filter((p) => p.quantity > 0 && p.quantity <= p.reorderPoint),
     [products]
@@ -50,7 +63,11 @@ export function Dashboard() {
     [products]
   );
   const openDocs = getDocuments().filter((d) => d.status === 'draft').length;
-  const expiring = useMemo(() => getExpiringBatches(30).length, [products]);
+  const expiring = useMemo(() => getExpiringBatches(30).length, [products, tick]);
+
+  const values = useMemo(() => getValueSnapshot(), [products, tick]);
+  const trend = useMemo(() => getProfitTrend(7), [products, tick]);
+  const maxProfit = Math.max(1, ...trend.map((d) => Math.abs(d.profit)));
 
   const alerts: { label: string; value: number; to: string; warn: boolean }[] = [
     { label: 'Open drafts', value: openDocs, to: '/documents', warn: openDocs > 0 },
@@ -92,6 +109,93 @@ export function Dashboard() {
           Four actions · stay on the floor
         </p>
       </header>
+
+      <div
+        className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border p-3"
+        style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
+      >
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+          >
+            <Wallet className="h-3.5 w-3.5" />
+          </div>
+          <p className="st-num text-sm font-bold" style={{ color: 'var(--st-text)' }}>
+            {formatMoney(values.inventoryValue)}
+          </p>
+          <p className="text-[10px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Inventory
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+          >
+            <ShoppingBag className="h-3.5 w-3.5" />
+          </div>
+          <p className="st-num text-sm font-bold" style={{ color: 'var(--st-text)' }}>
+            {formatMoney(values.salesValue)}
+          </p>
+          <p className="text-[10px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Sales
+          </p>
+        </div>
+        <div className="min-w-0 text-center">
+          <div
+            className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ background: 'var(--st-primary-soft)', color: 'var(--st-primary)' }}
+          >
+            <TrendingUp className="h-3.5 w-3.5" />
+          </div>
+          <p
+            className="st-num text-sm font-bold"
+            style={{
+              color: values.profit >= 0 ? 'var(--st-success)' : 'var(--st-danger)',
+            }}
+          >
+            {formatMoney(values.profit)}
+          </p>
+          <p className="text-[10px] font-semibold" style={{ color: 'var(--st-muted)' }}>
+            Profit
+          </p>
+        </div>
+      </div>
+
+      <div
+        className="mb-4 rounded-2xl border p-3"
+        style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
+      >
+        <p
+          className="mb-2 text-[10px] font-bold uppercase tracking-wide"
+          style={{ color: 'var(--st-muted)' }}
+        >
+          Profit · last 7 days
+        </p>
+        <div className="flex h-12 items-end gap-1">
+          {trend.map((d) => {
+            const h = Math.max(4, Math.round((Math.abs(d.profit) / maxProfit) * 40));
+            const pos = d.profit >= 0;
+            return (
+              <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5">
+                <div
+                  className="w-full max-w-[14px] rounded-t"
+                  style={{
+                    height: h,
+                    background: pos ? 'var(--st-success)' : 'var(--st-danger)',
+                    opacity: d.profit === 0 ? 0.25 : 0.85,
+                  }}
+                  title={`${d.date}: ${formatMoney(d.profit)}`}
+                />
+                <span className="text-[9px]" style={{ color: 'var(--st-muted)' }}>
+                  {d.date.slice(8)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div
         className="mb-4 grid grid-cols-4 gap-px overflow-hidden rounded-2xl border"
