@@ -140,12 +140,11 @@ export function Dashboard() {
         </p>
       </header>
 
-      {/* Value / profit strip */}
       <div
-        className="mb-3 grid grid-cols-3 gap-2 rounded-2xl border p-3"
+        className="st-kpi-strip st-stagger mb-3 grid grid-cols-3 gap-2 rounded-2xl border p-3"
         style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
       >
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
             style={{
@@ -155,14 +154,14 @@ export function Dashboard() {
           >
             <Wallet className="h-3.5 w-3.5" />
           </div>
-          <p className="st-num text-sm font-bold" style={{ color: 'var(--st-text)' }}>
+          <p className="st-num st-num-fluid text-sm font-bold" style={{ color: 'var(--st-text)' }}>
             {formatMoney(values.inventoryValue)}
           </p>
           <p className="text-[10px] font-semibold" style={{ color: 'var(--st-muted)' }}>
             Inventory
           </p>
         </div>
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
             style={{
@@ -172,14 +171,14 @@ export function Dashboard() {
           >
             <ShoppingBag className="h-3.5 w-3.5" />
           </div>
-          <p className="st-num text-sm font-bold" style={{ color: 'var(--st-text)' }}>
+          <p className="st-num st-num-fluid text-sm font-bold" style={{ color: 'var(--st-text)' }}>
             {formatMoney(values.salesValue)}
           </p>
           <p className="text-[10px] font-semibold" style={{ color: 'var(--st-muted)' }}>
             Sales
           </p>
         </div>
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-lg"
             style={{
@@ -190,7 +189,7 @@ export function Dashboard() {
             <TrendingUp className="h-3.5 w-3.5" />
           </div>
           <p
-            className="st-num text-sm font-bold"
+            className="st-num st-num-fluid text-sm font-bold"
             style={{
               color:
                 values.profit >= 0 ? 'var(--st-success)' : 'var(--st-danger)',
@@ -204,12 +203,11 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Ops KPIs: margin · cover · dead · expiry ₹ */}
       <div
-        className="mb-3 grid grid-cols-4 gap-2 rounded-2xl border p-2.5"
+        className="st-kpi-strip st-stagger mb-3 grid grid-cols-4 gap-2 rounded-2xl border p-2.5"
         style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
       >
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
             style={{
@@ -220,7 +218,7 @@ export function Dashboard() {
             <Percent className="h-3 w-3" />
           </div>
           <p
-            className="st-num text-sm font-bold leading-tight"
+            className="st-num st-num-fluid text-sm font-bold leading-tight"
             style={{
               color:
                 ops.marginPct >= 0 ? 'var(--st-success)' : 'var(--st-danger)',
@@ -232,7 +230,7 @@ export function Dashboard() {
             Margin
           </p>
         </div>
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
             style={{
@@ -242,7 +240,7 @@ export function Dashboard() {
           >
             <Clock className="h-3 w-3" />
           </div>
-          <p className="st-num text-sm font-bold leading-tight" style={{ color: 'var(--st-text)' }}>
+          <p className="st-num st-num-fluid text-sm font-bold leading-tight" style={{ color: 'var(--st-text)' }}>
             {coverLabel}
             {ops.daysOfCover != null && (
               <span className="text-[9px] font-semibold" style={{ color: 'var(--st-muted)' }}>
@@ -255,7 +253,7 @@ export function Dashboard() {
             Cover
           </p>
         </div>
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
             style={{
@@ -270,7 +268,7 @@ export function Dashboard() {
             <Package className="h-3 w-3" />
           </div>
           <p
-            className="st-num text-sm font-bold leading-tight"
+            className="st-num st-num-fluid text-sm font-bold leading-tight"
             style={{
               color:
                 ops.deadStockCount > 0 ? 'var(--st-warning)' : 'var(--st-text)',
@@ -282,7 +280,7 @@ export function Dashboard() {
             Dead 30d
           </p>
         </div>
-        <div className="min-w-0 text-center">
+        <div className="st-kpi-cell min-w-0 text-center">
           <div
             className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-md"
             style={{
@@ -297,7 +295,7 @@ export function Dashboard() {
             <CalendarClock className="h-3 w-3" />
           </div>
           <p
-            className="st-num text-sm font-bold leading-tight"
+            className="st-num st-num-fluid text-sm font-bold leading-tight"
             style={{
               color:
                 ops.expiryRiskValue > 0 ? 'var(--st-danger)' : 'var(--st-text)',
@@ -311,10 +309,9 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Open drafts by type */}
       {ops.drafts.total > 0 && (
         <div
-          className="mb-3 flex items-center gap-2 overflow-x-auto rounded-2xl border px-3 py-2"
+          className="st-chip-row mb-3 flex items-center gap-2 overflow-x-auto rounded-2xl border px-3 py-2"
           style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
         >
           <FileStack
@@ -353,7 +350,6 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* 7-day profit trend */}
       <div
         className="mb-4 rounded-2xl border p-3"
         style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface)' }}
@@ -371,7 +367,7 @@ export function Dashboard() {
             return (
               <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5">
                 <div
-                  className="w-full max-w-[14px] rounded-t"
+                  className="st-bar-grow w-full max-w-[14px] rounded-t"
                   style={{
                     height: h,
                     background: pos ? 'var(--st-success)' : 'var(--st-danger)',
@@ -396,7 +392,7 @@ export function Dashboard() {
           <Link
             key={a.label}
             to={a.to}
-            className="st-tap flex flex-col items-center gap-0.5 px-1 py-2.5 text-center"
+            className={`st-tap flex flex-col items-center gap-0.5 px-1 py-2.5 text-center${a.warn ? ' st-warn-pulse' : ''}`}
             style={{ background: 'var(--st-surface)' }}
           >
             <span
