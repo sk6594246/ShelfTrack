@@ -288,3 +288,139 @@ textarea {
     animation: none !important;
   }
 }
+
+/* ── Feature 139–150: deeper fluid KPI + nav ───────────────── */
+@keyframes st-bar-grow {
+  from { transform: scaleY(0); opacity: 0.4; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+.st-bar-grow {
+  transform-origin: bottom center;
+  animation: st-bar-grow var(--st-dur-slow) var(--st-ease) both;
+}
+.st-bar-grow:nth-child(1) { animation-delay: 0ms; }
+.st-bar-grow:nth-child(2) { animation-delay: 40ms; }
+.st-bar-grow:nth-child(3) { animation-delay: 80ms; }
+.st-bar-grow:nth-child(4) { animation-delay: 120ms; }
+.st-bar-grow:nth-child(5) { animation-delay: 160ms; }
+.st-bar-grow:nth-child(6) { animation-delay: 200ms; }
+.st-bar-grow:nth-child(7) { animation-delay: 240ms; }
+
+@keyframes st-chip-in {
+  from { opacity: 0; transform: translateX(-10px) scale(0.94); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+.st-chip-row > * {
+  animation: st-chip-in var(--st-dur) var(--st-ease-spring) both;
+}
+.st-chip-row > *:nth-child(1) { animation-delay: 0ms; }
+.st-chip-row > *:nth-child(2) { animation-delay: 35ms; }
+.st-chip-row > *:nth-child(3) { animation-delay: 70ms; }
+.st-chip-row > *:nth-child(4) { animation-delay: 105ms; }
+.st-chip-row > *:nth-child(5) { animation-delay: 140ms; }
+.st-chip-row > *:nth-child(6) { animation-delay: 175ms; }
+
+@keyframes st-warn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--st-warning) 0%, transparent); }
+  40% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--st-warning) 28%, transparent); }
+}
+.st-warn-pulse {
+  animation: st-warn-pulse 1.6s var(--st-ease) 1 both;
+}
+
+.st-kpi-strip {
+  transition: border-color var(--st-dur) var(--st-ease), box-shadow var(--st-dur) var(--st-ease);
+}
+.st-kpi-cell {
+  transition: transform var(--st-dur-fast) var(--st-ease-spring),
+    opacity var(--st-dur) var(--st-ease);
+}
+.st-kpi-cell:active {
+  transform: scale(0.96);
+}
+.st-num-fluid {
+  transition: color var(--st-dur) var(--st-ease), opacity var(--st-dur-fast) var(--st-ease);
+}
+
+.st-nav-rail {
+  transition: background-color var(--st-dur) var(--st-ease),
+    border-color var(--st-dur) var(--st-ease),
+    box-shadow var(--st-dur) var(--st-ease);
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.04);
+}
+html[data-theme='night'] .st-nav-rail {
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.st-nav-item {
+  transition: color var(--st-dur-fast) var(--st-ease),
+    transform var(--st-dur-fast) var(--st-ease-spring);
+  position: relative;
+}
+.st-nav-item:active {
+  transform: scale(0.94);
+}
+.st-nav-item[data-active='true'] {
+  color: var(--st-primary);
+}
+.st-nav-icon {
+  transition: transform var(--st-dur) var(--st-ease-spring),
+    color var(--st-dur-fast) var(--st-ease);
+}
+.st-nav-item[data-active='true'] .st-nav-icon {
+  transform: translateY(-2px) scale(1.1);
+}
+.st-nav-label {
+  transition: opacity var(--st-dur-fast) var(--st-ease),
+    transform var(--st-dur-fast) var(--st-ease),
+    color var(--st-dur-fast) var(--st-ease);
+}
+.st-nav-item[data-active='true'] .st-nav-label {
+  transform: translateY(-1px);
+}
+
+.st-nav-pill {
+  position: absolute;
+  top: 0;
+  height: 3px;
+  width: 2rem;
+  border-radius: 9999px;
+  background: var(--st-primary);
+  transition: left var(--st-dur) var(--st-ease), opacity var(--st-dur-fast) var(--st-ease);
+  pointer-events: none;
+}
+
+.st-fab {
+  transition: transform var(--st-dur) var(--st-ease-spring),
+    box-shadow var(--st-dur) var(--st-ease),
+    background-color var(--st-dur) var(--st-ease);
+}
+.st-fab:active {
+  transform: scale(0.92) rotate(45deg);
+}
+.st-fab-open {
+  transform: rotate(45deg);
+}
+
+.st-header-chip {
+  transition: background-color var(--st-dur) var(--st-ease),
+    color var(--st-dur) var(--st-ease),
+    transform var(--st-dur) var(--st-ease);
+}
+
+@keyframes st-page-swap {
+  from { opacity: 0; transform: translateY(8px) scale(0.992); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.st-page-fluid {
+  animation: st-page-swap var(--st-dur-slow) var(--st-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-bar-grow, .st-chip-row > *, .st-warn-pulse, .st-page-fluid {
+    animation: none !important;
+  }
+  .st-nav-pill, .st-nav-icon, .st-fab {
+    transition: none !important;
+  }
+}
