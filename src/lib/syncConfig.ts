@@ -78,3 +78,25 @@ export function getD1ApiUrl(): string | undefined {
 export function isLoggedIn(): boolean {
   return Boolean(getSession());
 }
+
+export function isD1Enabled(): boolean {
+  return Boolean(getD1ApiUrl());
+}
+
+export const SYNC_FAIL_HINT =
+  'Check Worker URL, D1 binding, and network. Retry in a moment if rate-limited.';
+
+/** Legacy tenant-only config (pre user-session). */
+export function getTenantConfig(): { tenantId: string; pin: string } | null {
+  try {
+    const tenantId =
+      localStorage.getItem(TENANT_ID_KEY)?.trim() ||
+      localStorage.getItem(TENANT_KEY)?.trim() ||
+      '';
+    const pin = localStorage.getItem(PIN_KEY) || '';
+    if (!tenantId || !pin) return null;
+    return { tenantId, pin };
+  } catch {
+    return null;
+  }
+}

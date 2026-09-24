@@ -85,62 +85,19 @@ CREATE TABLE IF NOT EXISTS partners (
   PRIMARY KEY (tenant_id, id)
 );
 
-CREATE TABLE IF NOT EXISTS partner_products (
-  tenant_id TEXT NOT NULL,
-  partner_id TEXT NOT NULL,
-  product_id TEXT NOT NULL,
-  role TEXT NOT NULL,
-  PRIMARY KEY (tenant_id, partner_id, product_id, role)
-);
-
-CREATE TABLE IF NOT EXISTS documents (
-  tenant_id TEXT NOT NULL,
-  id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  partner_id TEXT,
-  status TEXT NOT NULL DEFAULT 'draft',
-  notes TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  posted_at TEXT,
-  reversed_at TEXT,
-  reverses_document_id TEXT,
-  reversed_by_document_id TEXT,
+-- users (multi-role per tenant)
+CREATE TABLE IF NOT EXISTS users (
+  tenant_id    TEXT NOT NULL,
+  id           TEXT NOT NULL,
+  username     TEXT NOT NULL,
+  pin_hash     TEXT NOT NULL,
+  role         TEXT NOT NULL DEFAULT 'worker',
+  display_name TEXT,
+  active       INTEGER NOT NULL DEFAULT 1,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
   PRIMARY KEY (tenant_id, id)
 );
-CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant_id);
-
-CREATE TABLE IF NOT EXISTS document_lines (
-  tenant_id TEXT NOT NULL,
-  id TEXT NOT NULL,
-  document_id TEXT NOT NULL,
-  product_id TEXT NOT NULL,
-  quantity REAL NOT NULL,
-  location_id TEXT,
-  from_location_id TEXT,
-  to_location_id TEXT,
-  notes TEXT,
-  PRIMARY KEY (tenant_id, id)
-);
-CREATE INDEX IF NOT EXISTS idx_doc_lines_doc ON document_lines(tenant_id, document_id);
-
-CREATE TABLE IF NOT EXISTS stock_batches (
-  tenant_id TEXT NOT NULL,
-  id TEXT NOT NULL,
-  product_id TEXT NOT NULL,
-  location_id TEXT NOT NULL,
-  quantity REAL NOT NULL,
-  remaining REAL NOT NULL,
-  received_at TEXT NOT NULL,
-  document_id TEXT,
-  document_line_id TEXT,
-  PRIMARY KEY (tenant_id, id)
-);
-CREATE INDEX IF NOT EXISTS idx_batches_tenant ON stock_batches(tenant_id);
-
-CREATE TABLE IF NOT EXISTS config (
-  tenant_id TEXT NOT NULL,
-  key TEXT NOT NULL,
-  value TEXT NOT NULL,
-  PRIMARY KEY (tenant_id, key)
-);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_username
+  ON users (tenant_id, username);
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users (tenant_id);
