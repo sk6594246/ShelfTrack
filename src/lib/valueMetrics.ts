@@ -1,186 +1,163 @@
-import type { Product, ProfitDay } from '../types/inventory';
-import {
-  getBatches,
-  getInventoryValue,
-  getExpiringBatches,
-} from '../store/stockBatchStore';
+import type { Product } from '../types/inventory';
+import { getBatches, getExpiringBatches } from '../store/stockBatchStore';
 import { getDocuments, getLines } from '../store/documentsStore';
 
-const PROFIT_LOG_KEY = 'inventory_profit_log';
+const PROFIT_LOG_KEY = 'st_profit_log_v1';
 
-function loadLocal<T>(key: string, fallback: T): T {
+export type ProfitLogEntry = {
+  date: string; // YYYY-MM-DD
+  documentId: string;
+  revenue: number;
+  cogs: number;
+  profit: number;
+  postedAt: string;
+};
+
+function loadLog(): ProfitLogEntry[] {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    const raw = localStorage.getItem(PROFIT_LOG_KEY);
+    return raw ? (JSON.parse(raw) as ProfitLogEntry[]) : [];
   } catch {
-    return fallback;
+    return [];
   }
 }
 
-function saveLocal<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
+function saveLog(entries: ProfitLogEntry[]) {
+  localStorage.setItem(PROFIT_LOG_KEY, JSON.stringify(entries.slice(-500)));
 }
 
-function dayKey(iso?: string): string {
-  const d = iso ? new Date(iso) : new Date();
-  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
-  return d.toISOString().slice(0, 10);
+export function getProfitLog(): ProfitLogEntry[] {
+  return loadLog();
 }
 
-/** Append revenue/cogs from a posted sale into daily profit log */
 export function recordSaleProfit(input: {
   documentId: string;
   revenue: number;
   cogs: number;
   postedAt?: string;
-}) {
-  const date = dayKey(input.postedAt);
-  const log = loadLocal<ProfitDay[]>(PROFIT_LOG_KEY, []);
-  const idx = log.findIndex((r) => r.date === date);
+}): void {
+  const postedAt = input.postedAt || new Date().toISOString();
+  const date = postedAt.slice(0, 10);
   const profit = input.revenue - input.cogs;
-  if (idx >= 0) {
-    log[idx] = {
-      date,
-      revenue: log[idx].revenue + input.revenue,
-      cogs: log[idx].cogs + input.cogs,
-      profit: log[idx].profit + profit,
-    };
-  } else {
-    log.push({ date, revenue: input.revenue, cogs: input.cogs, profit });
-  }
-  log.sort((a, b) => a.date.localeCompare(b.date));
-  saveLocal(PROFIT_LOG_KEY, log);
+  const log = loadLog().filter((e) => e.documentId !== input.documentId);
+  log.push({
+    date,
+    documentId: input.documentId,
+    revenue: input.revenue,
+    cogs: input.cogs,
+    profit,
+    postedAt,
+  });
+  saveLog(log);
 }
 
-export function getProfitLog(): ProfitDay[] {
-  return loadLocal<ProfitDay[]>(PROFIT_LOG_KEY, []).sort((a, b) =>
-    a.date.localeCompare(b.date)
-  );
+export function formatMoney(n: number): string {
+  const abs = Math.abs(n);
+  const formatted =
+    abs >= 100000
+      ? `${(abs / 1000).toFixed(abs >= 1000000 ? 0 : 1)}k`
+      : abs >= 1000
+        ? abs.toLocaleString(undefined, { maximumFractionDigits: 0 })
+        : abs.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return n < 0 ? `-${formatted}` : formatted;
 }
 
-/** Rebuild sales totals from posted sale documents (authoritative for sales value) */
+export function formatPct(n: number): string {
+  if (!Number.isFinite(n)) return '—';
+  return `${n.toFixed(1)}%`;
+}
+
+/** Σ remaining × unitCost across batches */
+export function getInventoryValue(): number {
+  return getBatches()
+    .filter((b) => b.remaining > 0)
+    .reduce((s, b) => s + b.remaining * (b.unitCost || 0), 0);
+}
+
 export function getPostedSalesMetrics(): {
   salesValue: number;
-  cogsTotal: number;
+  cogs: number;
   profit: number;
   marginPct: number;
 } {
   let salesValue = 0;
-  let cogsTotal = 0;
+  let cogs = 0;
   for (const doc of getDocuments()) {
-    if (doc.type !== 'sale' || doc.status !== 'posted') continue;
+    if (doc.status !== 'posted' || doc.type !== 'sale') continue;
     for (const line of getLines(doc.id)) {
-      const price = line.unitPrice ?? 0;
+      const price = line.unitPrice || 0;
       salesValue += line.quantity * price;
-      cogsTotal += line.cogsTotal ?? 0;
+      if (line.cogsTotal != null) cogs += line.cogsTotal;
     }
   }
-  const profit = salesValue - cogsTotal;
+  const profit = salesValue - cogs;
   const marginPct = salesValue > 0 ? (profit / salesValue) * 100 : 0;
-  return {
-    salesValue,
-    cogsTotal,
-    profit,
-    marginPct,
-  };
+  return { salesValue, cogs, profit, marginPct };
 }
 
-export function getValueSnapshot() {
+export function getValueSnapshot(): {
+  inventoryValue: number;
+  salesValue: number;
+  profit: number;
+} {
   const inv = getInventoryValue();
   const sales = getPostedSalesMetrics();
   return {
     inventoryValue: inv,
     salesValue: sales.salesValue,
-    cogsTotal: sales.cogsTotal,
     profit: sales.profit,
-    marginPct: sales.marginPct,
   };
 }
 
-/** Last N calendar days of profit (fill zeros) */
-export function getProfitTrend(days = 7): ProfitDay[] {
+export function getProfitTrend(days = 7): { date: string; profit: number }[] {
   const log = getProfitLog();
-  const byDate = new Map(log.map((r) => [r.date, r]));
-  const out: ProfitDay[] = [];
+  const byDate = new Map<string, number>();
   const today = new Date();
   today.setHours(12, 0, 0, 0);
+  const out: { date: string; profit: number }[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
-    const row = byDate.get(key);
-    out.push(row || { date: key, revenue: 0, cogs: 0, profit: 0 });
+    byDate.set(key, 0);
+    out.push({ date: key, profit: 0 });
   }
-  return out;
+  for (const row of log) {
+    if (byDate.has(row.date)) {
+      byDate.set(row.date, (byDate.get(row.date) || 0) + row.profit);
+    }
+  }
+  return out.map((d) => ({ date: d.date, profit: byDate.get(d.date) || 0 }));
 }
 
-export function formatMoney(n: number): string {
-  const v = Number.isFinite(n) ? n : 0;
-  return v.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-export function formatPct(n: number): string {
-  const v = Number.isFinite(n) ? n : 0;
-  return `${v.toFixed(v >= 10 || v <= -10 ? 0 : 1)}%`;
-}
-
-/** ₹ at risk from batches expiring within N days (includes already expired remaining) */
-export function getExpiryRiskValue(withinDays = 30): number {
-  const byId = new Map(getBatches().map((b) => [b.id, b]));
-  return getExpiringBatches(withinDays).reduce((sum, r) => {
-    const b = byId.get(r.batchId);
-    return sum + r.remaining * (b?.unitCost ?? 0);
-  }, 0);
-}
-
-/**
- * Dead stock: products with qty > 0 and no posted sale in the last N days,
- * and newest remaining batch receivedAt older than N days (stale on shelf).
- */
 export function getDeadStockProducts(
   products: Product[],
-  withinDays = 30
+  idleDays = 30
 ): Product[] {
-  const cutoff = new Date();
-  cutoff.setHours(0, 0, 0, 0);
-  cutoff.setDate(cutoff.getDate() - withinDays);
-  const cutoffIso = cutoff.toISOString();
-
-  const soldRecently = new Set<string>();
-  for (const doc of getDocuments()) {
-    if (doc.type !== 'sale' || doc.status !== 'posted') continue;
-    const when = doc.postedAt || doc.updatedAt || doc.createdAt;
-    if (!when || when < cutoffIso) continue;
-    for (const line of getLines(doc.id)) {
-      soldRecently.add(line.productId);
-    }
-  }
-
-  const newestBatchByProduct = new Map<string, string>();
+  const cutoff = Date.now() - idleDays * 86400000;
+  const moved = new Set<string>();
   for (const b of getBatches()) {
     if (b.remaining <= 0) continue;
-    const prev = newestBatchByProduct.get(b.productId);
-    if (!prev || b.receivedAt > prev) {
-      newestBatchByProduct.set(b.productId, b.receivedAt);
-    }
+    const t = new Date(b.receivedAt || 0).getTime();
+    if (t >= cutoff) moved.add(b.productId);
   }
+  return products.filter(
+    (p) => p.quantity > 0 && !moved.has(p.id)
+  );
+}
 
-  return products.filter((p) => {
-    if (p.quantity <= 0) return false;
-    if (soldRecently.has(p.id)) return false;
-    const newest = newestBatchByProduct.get(p.id);
-    if (!newest) return true;
-    return newest < cutoffIso;
-  });
+export function getExpiryRiskValue(withinDays = 30): number {
+  return getExpiringBatches(withinDays).reduce(
+    (s, b) => s + b.remaining * (b.unitCost || 0),
+    0
+  );
 }
 
 /** Inventory value ÷ average daily COGS over lookback (null if no COGS) */
 export function getDaysOfCover(lookbackDays = 30): number | null {
   const inv = getInventoryValue();
-  if (inv <= 0) return 0;
+  // Empty floor → no cover metric (Dashboard shows "—")
+  if (inv <= 0) return null;
 
   const log = getProfitLog();
   const cutoff = new Date();
