@@ -63,18 +63,41 @@ export function AppShell() {
   const cloudOn = isD1Enabled() || isGasEnabled();
   const shift = shiftLabel();
 
+  // BUG-MU-01: do not key off unstable `session` object — cleanup was clearing
+  // the dismiss timer while leaving showSplash=true, so the overlay stuck forever.
+  const sessionKey = session
+    ? `${session.tenantId || ''}:${session.username || ''}`
+    : '';
+
   useEffect(() => {
+    if (!sessionKey) {
+      setShowSplash(false);
+      return;
+    }
+    let already = false;
     try {
-      if (!sessionStorage.getItem(SPLASH_KEY) && session) {
-        setShowSplash(true);
-        sessionStorage.setItem(SPLASH_KEY, '1');
-        const t = window.setTimeout(() => setShowSplash(false), 2800);
-        return () => window.clearTimeout(t);
-      }
+      already = sessionStorage.getItem(SPLASH_KEY) === '1';
+    } catch {
+      /* private mode */
+    }
+    if (already) {
+      setShowSplash(false);
+      return;
+    }
+    try {
+      sessionStorage.setItem(SPLASH_KEY, '1');
     } catch {
       /* ignore */
     }
-  }, [session]);
+    setShowSplash(true);
+    const t = window.setTimeout(() => setShowSplash(false), 2200);
+    // Hard safety: never leave splash up more than 4s even if this effect re-runs
+    const hard = window.setTimeout(() => setShowSplash(false), 4000);
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(hard);
+    };
+  }, [sessionKey]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-role', role);
@@ -130,6 +153,9 @@ export function AppShell() {
         <div
           className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 px-6 text-center"
           style={{ background: 'var(--st-bg)' }}
+          role="dialog"
+          aria-label="Shift start"
+          onClick={() => setShowSplash(false)}
         >
           <div
             className="flex h-16 w-16 items-center justify-center rounded-2xl text-white shadow-lg"
