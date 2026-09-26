@@ -153,10 +153,16 @@ export async function d1RegisterUser(payload: {
   role?: string;
   displayName?: string;
 }) {
+  // Auth uses session username/pin; new account uses newUsername/newPin
   return d1Request<{
     ok: boolean;
     user: { id: string; username: string; role: string; displayName: string };
-  }>('registerUser', payload);
+  }>('registerUser', {
+    newUsername: payload.username,
+    newPin: payload.pin,
+    role: payload.role,
+    displayName: payload.displayName,
+  });
 }
 
 export async function d1ListUsers() {

@@ -1,56 +1,40 @@
 # Deploy the D1 Worker (MU-02 multi-user)
 
-## 1. Apply users migration (D1)
+## Status
+- `loginUser` / `listUsers` work on live API after your deploy.
+- **Bug fixed 2026-09-26:** `registerUser` must use `newUsername` / `newPin` (not the admin auth fields).
+- Redeploy Worker from `artifacts/Shelf-Track/ShelfTrack_worker.js` (or `worker/src/index.js`) for create-user to work from Settings.
 
-In Cloudflare Dashboard → D1 → your database → Console, run:
+## 1. Users table (if not done)
+Run `worker/migrations/0002_users.sql` in D1 Console.
 
-```sql
-CREATE TABLE IF NOT EXISTS users (
-  tenant_id    TEXT NOT NULL,
-  id           TEXT NOT NULL,
-  username     TEXT NOT NULL,
-  pin_hash     TEXT NOT NULL,
-  role         TEXT NOT NULL DEFAULT 'worker',
-  display_name TEXT,
-  active       INTEGER NOT NULL DEFAULT 1,
-  created_at   TEXT NOT NULL,
-  updated_at   TEXT NOT NULL,
-  PRIMARY KEY (tenant_id, id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tenant_username ON users (tenant_id, username);
-CREATE INDEX IF NOT EXISTS idx_users_tenant ON users (tenant_id);
-```
+## 2. Optional seed team accounts
+Run `worker/migrations/0003_seed_team_users.sql`:
+- `worker1` / PIN `1234` (role worker)
+- `manager1` / PIN `5678` (role manager)
+- existing `sk` / `787255` (admin)
 
-Or: `npx wrangler d1 execute <DB_NAME> --remote --file=worker/migrations/0002_users.sql`
-
-## 2. Deploy full worker with user actions
-
-Source of truth for the **complete** Worker (products + masters + loginUser/listUsers/registerUser):
-
-- Artifact: `artifacts/ShelfTrack_worker.js` or `worker/src/index.js` in this project
-- Cloudflare → Workers → `shelftrackapiworker` (or your API worker) → Edit code → paste full file → Save & Deploy
-- Binding name must be `DB`
-
-## 3. Seed first admin user (SQL)
-
-After migration, insert admin matching your PIN hash, **or** use `registerTenant` / Settings People after deploy.
-
-Quick path if you already login with legacy `authTenant`:
-1. Deploy worker with loginUser
-2. Register user via Settings → People (admin form)
-3. Sign out and sign in with new username + PIN
+## 3. Redeploy Worker (registerUser fix)
+Cloudflare → Workers → **shelftrackapiworker** → paste full `ShelfTrack_worker.js` → Save & Deploy. Binding: `DB`.
 
 ## 4. Frontend
-
-Already on main:
-- `src/lib/d1Api.ts` — listUsers / registerUser / loginUser (+ retry)
-- `src/pages/settings/Settings.tsx` — People panel
-- Login still falls back to `authTenant` until `loginUser` exists on Worker
+- Settings → People → Add user (admin only)
+- Login: company + username + PIN via `loginUser`
 
 ## Test
-
 ```bash
+# List
 curl -X POST https://shelftrackapiworker.sk6594246.workers.dev/ \
   -H 'Content-Type: application/json' \
   -d '{"action":"listUsers","tenantId":"sk_enterprise","username":"sk","pin":"787255"}'
+
+# Register (after worker fix)
+curl -X POST https://shelftrackapiworker.sk6594246.workers.dev/ \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"registerUser","tenantId":"sk_enterprise","username":"sk","pin":"787255","newUsername":"worker2","newPin":"9999","role":"worker","displayName":"W2"}'
+
+# Login as worker
+curl -X POST https://shelftrackapiworker.sk6594246.workers.dev/ \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"loginUser","tenantId":"sk_enterprise","username":"worker1","pin":"1234"}'
 ```
