@@ -35,11 +35,17 @@ export function scheduleWriteThrough(_reason?: string): void {
 /** Push now (e.g. after post document). Safe to call often. */
 export async function flushWriteThrough(): Promise<void> {
   if (!isD1Enabled() || !getSession()) return;
+  if (!dirty && !inflight) {
+    // still allow explicit flush after critical ops
+  }
   if (inflight) return inflight;
 
   dirty = false;
   inflight = (async () => {
     try {
+      try {
+        window.dispatchEvent(new CustomEvent('st-sync-start', { detail: { at: Date.now() } }));
+      } catch { /* ignore */ }
       await pushToDbSafe();
       try {
         window.dispatchEvent(new CustomEvent('st-sync-ok', { detail: { at: Date.now() } }));
@@ -60,6 +66,7 @@ export async function flushWriteThrough(): Promise<void> {
       }
     } finally {
       inflight = null;
+      // if more mutations arrived during push, schedule again
       if (dirty) scheduleWriteThrough('retry');
     }
   })();
@@ -99,10 +106,11 @@ export async function pushToDbSafe(): Promise<void> {
         snap.products = remote as FullSnapshot['products'];
       }
     } catch {
-      /* keep local empty products */
+      /* keep empty — remote products unchanged only if worker merges; our push replaces */
     }
   }
 
+  // Always push full ops surface: docs + lines + batches are the multi-device critical path
   await d1PushSnapshot(snap as unknown as Record<string, unknown>);
 }
 
