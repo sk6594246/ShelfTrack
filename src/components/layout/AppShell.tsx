@@ -24,6 +24,7 @@ import { createDocument } from '../../store/documentsStore';
 import { hydrateMastersFromGas } from '../../store/mastersStore';
 import { isGasEnabled, isD1Enabled } from '../../lib/gasApi';
 import { getSession } from '../../lib/syncConfig';
+import { pullOnSession } from '../../lib/liveSync';
 import { shiftLabel } from '../../lib/uiPrefs';
 
 const navItems = [
@@ -63,8 +64,6 @@ export function AppShell() {
   const cloudOn = isD1Enabled() || isGasEnabled();
   const shift = shiftLabel();
 
-  // BUG-MU-01: do not key off unstable `session` object — cleanup was clearing
-  // the dismiss timer while leaving showSplash=true, so the overlay stuck forever.
   const sessionKey = session
     ? `${session.tenantId || ''}:${session.username || ''}`
     : '';
@@ -91,12 +90,17 @@ export function AppShell() {
     }
     setShowSplash(true);
     const t = window.setTimeout(() => setShowSplash(false), 2200);
-    // Hard safety: never leave splash up more than 4s even if this effect re-runs
     const hard = window.setTimeout(() => setShowSplash(false), 4000);
     return () => {
       window.clearTimeout(t);
       window.clearTimeout(hard);
     };
+  }, [sessionKey]);
+
+  // MU-03: pull D1 snapshot when a user session is active
+  useEffect(() => {
+    if (!sessionKey) return;
+    void pullOnSession(true);
   }, [sessionKey]);
 
   useEffect(() => {
@@ -261,7 +265,7 @@ export function AppShell() {
           <span
             className="st-nav-pill"
             style={{
-              left: `calc(${(100 / navItems.length) * activeNavIndex}% + ${100 / navItems.length / 2}% - 1rem)`,
+              left: `calc(${(100 / navItems.length) * Math.max(0, activeNavIndex)}% + ${100 / navItems.length / 2}% - 1rem)`,
               opacity: activeNavIndex >= 0 ? 1 : 0,
             }}
             aria-hidden
@@ -304,86 +308,32 @@ export function AppShell() {
               <p className="text-sm font-bold" style={{ color: 'var(--st-text)' }}>
                 Warehouse ops
               </p>
-              <button
-                type="button"
-                onClick={() => setOpsOpen(false)}
-                className="st-tap rounded-lg p-2"
-                style={{ color: 'var(--st-muted)' }}
-              >
+              <button type="button" onClick={() => setOpsOpen(false)} className="st-tap rounded-lg p-2" style={{ color: 'var(--st-muted)' }}>
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                {
-                  label: 'Quick receive',
-                  sub: 'Qty + bin sheet',
-                  icon: Zap,
-                  onClick: () => {
-                    setOpsOpen(false);
-                    setQuickReceive(true);
-                  },
-                },
-                {
-                  label: 'Receive',
-                  sub: 'Inbound GR',
-                  icon: Truck,
-                  onClick: () => {
-                    setOpsOpen(false);
-                    navigate('/receive');
-                  },
-                },
-                {
-                  label: 'Purchase',
-                  sub: 'New document',
-                  icon: Package,
-                  onClick: () => startDoc('purchase'),
-                },
-                {
-                  label: 'Transfer',
-                  sub: 'Move bins',
-                  icon: ArrowLeftRight,
-                  onClick: () => startDoc('transfer'),
-                },
-                {
-                  label: 'Sale',
-                  sub: 'Outbound',
-                  icon: ShoppingCart,
-                  onClick: () => startDoc('sale'),
-                },
-                {
-                  label: 'Scan',
-                  sub: 'QR camera',
-                  icon: QrCode,
-                  onClick: () => {
-                    setOpsOpen(false);
-                    navigate('/scan');
-                  },
-                },
+                { label: 'Quick receive', sub: 'Qty + bin sheet', icon: Zap, onClick: () => { setOpsOpen(false); setQuickReceive(true); } },
+                { label: 'Receive', sub: 'Inbound GR', icon: Truck, onClick: () => { setOpsOpen(false); navigate('/receive'); } },
+                { label: 'Purchase', sub: 'New document', icon: Package, onClick: () => startDoc('purchase') },
+                { label: 'Transfer', sub: 'Move bins', icon: ArrowLeftRight, onClick: () => startDoc('transfer') },
+                { label: 'Sale', sub: 'Outbound', icon: ShoppingCart, onClick: () => startDoc('sale') },
+                { label: 'Scan', sub: 'QR camera', icon: QrCode, onClick: () => { setOpsOpen(false); navigate('/scan'); } },
               ].map((item) => (
                 <button
                   key={item.label}
                   type="button"
                   onClick={item.onClick}
                   className="st-tap st-tile-press flex items-center gap-3 rounded-2xl border p-3 text-left"
-                  style={{
-                    borderColor: 'var(--st-border)',
-                    background: 'var(--st-surface-2)',
-                  }}
+                  style={{ borderColor: 'var(--st-border)', background: 'var(--st-surface-2)' }}
                 >
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-xl text-white"
-                    style={{ background: 'var(--st-primary)' }}
-                  >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white" style={{ background: 'var(--st-primary)' }}>
                     <item.icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--st-text)' }}>
-                      {item.label}
-                    </p>
-                    <p className="text-[11px]" style={{ color: 'var(--st-muted)' }}>
-                      {item.sub}
-                    </p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--st-text)' }}>{item.label}</p>
+                    <p className="text-[11px]" style={{ color: 'var(--st-muted)' }}>{item.sub}</p>
                   </div>
                 </button>
               ))}
@@ -404,9 +354,7 @@ export function AppShell() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-bold" style={{ color: 'var(--st-text)' }}>
-                More
-              </p>
+              <p className="text-sm font-bold" style={{ color: 'var(--st-text)' }}>More</p>
               <button type="button" onClick={() => setMoreOpen(false)} style={{ color: 'var(--st-muted)' }}>
                 <X className="h-5 w-5" />
               </button>
@@ -416,10 +364,7 @@ export function AppShell() {
                 <button
                   key={to}
                   type="button"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    navigate(to);
-                  }}
+                  onClick={() => { setMoreOpen(false); navigate(to); }}
                   className="st-tap flex w-full items-center gap-3 rounded-xl px-3 py-3.5 text-left"
                   style={{ color: 'var(--st-text)' }}
                 >
