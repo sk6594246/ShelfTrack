@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Grid3x3, MapPin, Package, Settings2 } from 'lucide-react';
+import { Grid3x3, MapPin, Package, Settings2, Layers } from 'lucide-react';
 import { getProducts } from '../store/inventoryStore';
 import {
   getLocations,
@@ -12,6 +12,7 @@ import {
   getAvailableQtyForProductAtLocation,
   getBatches,
   batchBelongsToProduct,
+  getUnlocatedQty,
 } from '../store/stockBatchStore';
 import type { Location, Product } from '../types/inventory';
 
@@ -119,6 +120,24 @@ export function StockMap() {
     );
   }, [products, productQuery]);
 
+  /** Stock not assigned to any bin — still on the floor / receiving area */
+  const unlocatedRows = useMemo(() => {
+    const source =
+      selectedProducts.length > 0 ? selectedProducts : products;
+    return source
+      .map((p) => {
+        const qty = getUnlocatedQty(p.id, Number(p.quantity) || 0);
+        return { product: p, qty };
+      })
+      .filter((r) => r.qty > 0)
+      .sort((a, b) => b.qty - a.qty);
+  }, [products, selectedProducts]);
+
+  const unlocatedTotal = useMemo(
+    () => unlocatedRows.reduce((s, r) => s + r.qty, 0),
+    [unlocatedRows]
+  );
+
   const cellData = useMemo(() => {
     const map = new Map<string, CellShelf[]>();
     if (selectedProducts.length === 0) return map;
@@ -132,11 +151,9 @@ export function StockMap() {
       const productQtys: ProductQty[] = [];
       let totalQty = 0;
       let firstGr: string | null = null;
-      let anyAssigned = false;
 
       for (const product of selectedProducts) {
         const assigned = getProductsForLocation(loc.id).includes(product.id);
-        if (assigned) anyAssigned = true;
         const qty = getAvailableQtyForProductAtLocation(product, loc.id);
         if (qty > 0 || assigned) {
           productQtys.push({
@@ -157,37 +174,40 @@ export function StockMap() {
       let usedSpace = 0;
       for (const pq of productQtys) {
         const w = getWeightageForProductAtLocation(loc.id, pq.product.id);
-        usedSpace += pq.qty * w;
+        usedSpace += pq.qty * (w || 1);
       }
-      const maxQ = loc.maxQty;
       const capacityPct =
-        maxQ != null && maxQ > 0
-          ? Math.min(100, Math.round((usedSpace / maxQ) * 100))
+        loc.maxQty && loc.maxQty > 0
+          ? Math.min(100, Math.round((usedSpace / loc.maxQty) * 100))
           : null;
 
-      const list = map.get(key) || [];
-      list.push({
+      const shelf: CellShelf = {
         location: loc,
         productQtys,
         totalQty,
         firstGr,
-        assigned: anyAssigned,
+        assigned: productQtys.some((pq) =>
+          getProductsForLocation(loc.id).includes(pq.product.id)
+        ),
         usedSpace,
         capacityPct,
-      });
-      map.set(key, list);
-    }
+      };
 
-    for (const [, list] of map) {
+      const list = map.get(key) || [];
+      list.push(shelf);
       list.sort((a, b) => (a.location.shelf || 1) - (b.location.shelf || 1));
+      map.set(key, list);
     }
     return map;
   }, [selectedProducts, locations, layout.rows, layout.cols, colorByProductId]);
 
   const cellTotals = useMemo(() => {
     const m = new Map<string, number>();
-    for (const [key, list] of cellData) {
-      m.set(key, list.reduce((s, x) => s + x.totalQty, 0));
+    for (const [key, shelves] of cellData) {
+      m.set(
+        key,
+        shelves.reduce((s, sh) => s + sh.totalQty, 0)
+      );
     }
     return m;
   }, [cellData]);
@@ -204,7 +224,7 @@ export function StockMap() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Stock map</h1>
           <p className="mt-0.5 text-sm text-slate-500">
-            Select products — stacked bars + capacity % when max qty is set
+            Bins on the grid · unlocated (on floor) listed below
           </p>
         </div>
         <Link
@@ -273,6 +293,17 @@ export function StockMap() {
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
                     )}
                     <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                    {(() => {
+                      const floor = getUnlocatedQty(p.id, Number(p.quantity) || 0);
+                      return floor > 0 ? (
+                        <span
+                          className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                          title="On floor — no location"
+                        >
+                          Floor {floor}
+                        </span>
+                      ) : null;
+                    })()}
                     <span className="text-[11px] text-slate-400">{p.sku}</span>
                   </label>
                 );
@@ -414,6 +445,77 @@ export function StockMap() {
           )}
         </div>
       </div>
+
+      {/* On floor — no location assigned */}
+      <section
+        className="mt-4 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 shadow-sm"
+        aria-label="Unlocated stock on floor"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+              <Layers className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-950">On floor</p>
+              <p className="text-[11px] font-medium text-amber-800/80">
+                No location assigned · put away via Transfer
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="st-num text-lg font-bold tabular-nums text-amber-950">
+              {unlocatedTotal}
+            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              units
+            </p>
+          </div>
+        </div>
+        {unlocatedRows.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-amber-800/70">
+            {loading
+              ? 'Loading…'
+              : selectedProducts.length > 0
+                ? 'Selected products are fully in bins'
+                : 'No unlocated stock — everything is in a location'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-amber-100/80">
+            {unlocatedRows.map(({ product: p, qty }) => {
+              const color = colorByProductId.get(p.id);
+              return (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: color || '#d97706' }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-900">
+                      {p.name}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {p.sku || '—'} · total {Number(p.quantity) || 0}
+                    </p>
+                  </div>
+                  <span className="st-num rounded-xl bg-white px-2.5 py-1 text-sm font-bold tabular-nums text-amber-900 shadow-sm ring-1 ring-amber-200">
+                    {qty}
+                  </span>
+                  <Link
+                    to={`/documents`}
+                    className="hidden text-[11px] font-bold text-amber-800 underline-offset-2 hover:underline sm:inline"
+                  >
+                    Put away
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
