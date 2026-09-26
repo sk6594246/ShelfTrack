@@ -120,15 +120,13 @@ export function StockMap() {
     );
   }, [products, productQuery]);
 
-  /** Stock not assigned to any bin — still on the floor / receiving area */
   const unlocatedRows = useMemo(() => {
-    const source =
-      selectedProducts.length > 0 ? selectedProducts : products;
+    const source = selectedProducts.length > 0 ? selectedProducts : products;
     return source
-      .map((p) => {
-        const qty = getUnlocatedQty(p.id, Number(p.quantity) || 0);
-        return { product: p, qty };
-      })
+      .map((p) => ({
+        product: p,
+        qty: getUnlocatedQty(p.id, Number(p.quantity) || 0),
+      }))
       .filter((r) => r.qty > 0)
       .sort((a, b) => b.qty - a.qty);
   }, [products, selectedProducts]);
@@ -204,10 +202,7 @@ export function StockMap() {
   const cellTotals = useMemo(() => {
     const m = new Map<string, number>();
     for (const [key, shelves] of cellData) {
-      m.set(
-        key,
-        shelves.reduce((s, sh) => s + sh.totalQty, 0)
-      );
+      m.set(key, shelves.reduce((s, sh) => s + sh.totalQty, 0));
     }
     return m;
   }, [cellData]);
@@ -276,6 +271,7 @@ export function StockMap() {
               filteredProducts.map((p) => {
                 const checked = selectedIds.includes(p.id);
                 const color = colorByProductId.get(p.id);
+                const floor = getUnlocatedQty(p.id, Number(p.quantity) || 0);
                 return (
                   <label
                     key={p.id}
@@ -293,17 +289,14 @@ export function StockMap() {
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
                     )}
                     <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                    {(() => {
-                      const floor = getUnlocatedQty(p.id, Number(p.quantity) || 0);
-                      return floor > 0 ? (
-                        <span
-                          className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
-                          title="On floor — no location"
-                        >
-                          Floor {floor}
-                        </span>
-                      ) : null;
-                    })()}
+                    {floor > 0 && (
+                      <span
+                        className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                        title="On floor — no location"
+                      >
+                        Floor {floor}
+                      </span>
+                    )}
                     <span className="text-[11px] text-slate-400">{p.sku}</span>
                   </label>
                 );
@@ -446,7 +439,6 @@ export function StockMap() {
         </div>
       </div>
 
-      {/* On floor — no location assigned */}
       <section
         className="mt-4 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 shadow-sm"
         aria-label="Unlocated stock on floor"
@@ -485,18 +477,13 @@ export function StockMap() {
             {unlocatedRows.map(({ product: p, qty }) => {
               const color = colorByProductId.get(p.id);
               return (
-                <li
-                  key={p.id}
-                  className="flex items-center gap-3 px-4 py-2.5"
-                >
+                <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ background: color || '#d97706' }}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-900">
-                      {p.name}
-                    </p>
+                    <p className="truncate text-sm font-semibold text-slate-900">{p.name}</p>
                     <p className="text-[11px] text-slate-500">
                       {p.sku || '—'} · total {Number(p.quantity) || 0}
                     </p>
@@ -505,7 +492,7 @@ export function StockMap() {
                     {qty}
                   </span>
                   <Link
-                    to={`/documents`}
+                    to="/documents"
                     className="hidden text-[11px] font-bold text-amber-800 underline-offset-2 hover:underline sm:inline"
                   >
                     Put away
